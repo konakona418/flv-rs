@@ -27,6 +27,14 @@ impl Decoder {
         result
     }
 
+    pub fn drain_bytes_vec(&mut self, size: usize) -> Vec<u8> {
+        let mut result = Vec::with_capacity(size);
+        for _ in 0..size {
+            result.push(self.data.remove(0));
+        }
+        result
+    }
+
     pub fn drain_u16_le(&mut self) -> u16 {
         let mut result = 0;
         result |= self.data.remove(0) as u16;
@@ -73,6 +81,50 @@ impl Decoder {
         result |= (self.data.remove(0) as u32) << 8;
         result |= self.data.remove(0) as u32;
         result
+    }
+
+    pub fn drain_f64(&mut self) -> f64 {
+        let mut result = 0;
+        result |= (self.data.remove(0) as u64) << 56;
+        result |= (self.data.remove(0) as u64) << 48;
+        result |= (self.data.remove(0) as u64) << 40;
+        result |= (self.data.remove(0) as u64) << 32;
+        result |= (self.data.remove(0) as u64) << 24;
+        result |= (self.data.remove(0) as u64) << 16;
+        result |= (self.data.remove(0) as u64) << 8;
+        result |= self.data.remove(0) as u64;
+        f64::from_bits(result)
+    }
+
+    pub fn drain_f64_le(&mut self) -> f64 {
+        let mut result = 0;
+        result |= self.data.remove(0) as u64;
+        result |= (self.data.remove(0) as u64) << 8;
+        result |= (self.data.remove(0) as u64) << 16;
+        result |= (self.data.remove(0) as u64) << 24;
+        result |= (self.data.remove(0) as u64) << 32;
+        result |= (self.data.remove(0) as u64) << 40;
+        result |= (self.data.remove(0) as u64) << 48;
+        result |= (self.data.remove(0) as u64) << 56;
+        f64::from_bits(result)
+    }
+
+    pub fn drain_f32_le(&mut self) -> f32 {
+        let mut result = 0;
+        result |= self.data.remove(0) as u32;
+        result |= (self.data.remove(0) as u32) << 8;
+        result |= (self.data.remove(0) as u32) << 16;
+        result |= (self.data.remove(0) as u32) << 24;
+        f32::from_bits(result)
+    }
+
+    pub fn drain_f32(&mut self) -> f32 {
+        let mut result = 0;
+        result |= (self.data.remove(0) as u32) << 24;
+        result |= (self.data.remove(0) as u32) << 16;
+        result |= (self.data.remove(0) as u32) << 8;
+        result |= self.data.remove(0) as u32;
+        f32::from_bits(result)
     }
 
     pub fn decode_header(&mut self) -> Result<FlvHeader, Box<dyn std::error::Error>> {
