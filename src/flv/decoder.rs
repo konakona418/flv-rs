@@ -4,16 +4,17 @@ use crate::flv::script::ScriptTagBody;
 use crate::flv::tag::{EncryptedTagBody, NormalTagBody, Tag, TagBody, TagType};
 use crate::io::bit::BitIO;
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::rc::Rc;
 
 pub struct Decoder {
-    data: Vec<u8>,
+    data: VecDeque<u8>,
     previous_tag_size: u32,
     core: Rc<RefCell<Core>>
 }
 
 impl Decoder {
-    pub fn new(data: Vec<u8>, core: Rc<RefCell<Core>>) -> Self {
+    pub fn new(data: VecDeque<u8>, core: Rc<RefCell<Core>>) -> Self {
         Decoder {
             data,
             previous_tag_size: 0,
@@ -21,174 +22,193 @@ impl Decoder {
         }
     }
 
-    pub fn push_data(&mut self, data: &mut Vec<u8>) {
+    pub fn push_data(&mut self, data: &mut VecDeque<u8>) {
         self.data.append(data);
     }
 
     pub fn push_bytes(&mut self, bytes: &[u8]) {
-        self.data.extend_from_slice(bytes);
+        self.data.extend(bytes)
     }
 
+    #[inline]
     pub fn drain_u8(&mut self) -> u8 {
-        self.data.remove(0)
+        self.data.pop_front().unwrap()
     }
 
+    #[inline]
     pub fn drain_bytes<const SIZE: usize>(&mut self) -> [u8; SIZE] {
         let mut result = [0; SIZE];
         for i in 0..SIZE {
-            result[i] = self.data.remove(0);
+            result[i] = self.drain_u8();
         }
         result
     }
 
+    #[inline]
     pub fn drain_bytes_vec(&mut self, size: usize) -> Vec<u8> {
         let drained = self.data.drain(0..size).collect::<Vec<_>>();
         drained
     }
 
+    #[inline]
     pub fn drain_u16_le(&mut self) -> u16 {
         let mut result = 0;
-        result |= self.data.remove(0) as u16;
-        result |= (self.data.remove(0) as u16) << 8;
+        result |= self.drain_u8() as u16;
+        result |= (self.drain_u8() as u16) << 8;
         result
     }
 
+    #[inline]
     pub fn drain_u16(&mut self) -> u16 {
         let mut result = 0;
-        result |= (self.data.remove(0) as u16) << 8;
-        result |= self.data.remove(0) as u16;
+        result |= (self.drain_u8() as u16) << 8;
+        result |= self.drain_u8() as u16;
         result
     }
 
+    #[inline]
     pub fn drain_u24_le(&mut self) -> u32 {
         let mut result = 0;
-        result |= self.data.remove(0) as u32;
-        result |= (self.data.remove(0) as u32) << 8;
-        result |= (self.data.remove(0) as u32) << 16;
+        result |= self.drain_u8() as u32;
+        result |= (self.drain_u8() as u32) << 8;
+        result |= (self.drain_u8() as u32) << 16;
         result
     }
 
+    #[inline]
     pub fn drain_u24(&mut self) -> u32 {
         let mut result = 0;
-        result |= (self.data.remove(0) as u32) << 16;
-        result |= (self.data.remove(0) as u32) << 8;
-        result |= self.data.remove(0) as u32;
+        result |= (self.drain_u8() as u32) << 16;
+        result |= (self.drain_u8() as u32) << 8;
+        result |= self.drain_u8() as u32;
         result
     }
 
+    #[inline]
     pub fn drain_u32_le(&mut self) -> u32 {
         let mut result = 0;
-        result |= self.data.remove(0) as u32;
-        result |= (self.data.remove(0) as u32) << 8;
-        result |= (self.data.remove(0) as u32) << 16;
-        result |= (self.data.remove(0) as u32) << 24;
+        result |= self.drain_u8() as u32;
+        result |= (self.drain_u8() as u32) << 8;
+        result |= (self.drain_u8() as u32) << 16;
+        result |= (self.drain_u8() as u32) << 24;
         result
     }
 
+    #[inline]
     pub fn drain_u32(&mut self) -> u32 {
         let mut result = 0;
-        result |= (self.data.remove(0) as u32) << 24;
-        result |= (self.data.remove(0) as u32) << 16;
-        result |= (self.data.remove(0) as u32) << 8;
-        result |= self.data.remove(0) as u32;
+        result |= (self.drain_u8() as u32) << 24;
+        result |= (self.drain_u8() as u32) << 16;
+        result |= (self.drain_u8() as u32) << 8;
+        result |= self.drain_u8() as u32;
         result
     }
 
+    #[inline]
     pub fn drain_u64(&mut self) -> u64 {
         let mut result = 0;
-        result |= (self.data.remove(0) as u64) << 56;
-        result |= (self.data.remove(0) as u64) << 48;
-        result |= (self.data.remove(0) as u64) << 40;
-        result |= (self.data.remove(0) as u64) << 32;
-        result |= (self.data.remove(0) as u64) << 24;
-        result |= (self.data.remove(0) as u64) << 16;
-        result |= (self.data.remove(0) as u64) << 8;
-        result |= self.data.remove(0) as u64;
+        result |= (self.drain_u8() as u64) << 56;
+        result |= (self.drain_u8() as u64) << 48;
+        result |= (self.drain_u8() as u64) << 40;
+        result |= (self.drain_u8() as u64) << 32;
+        result |= (self.drain_u8() as u64) << 24;
+        result |= (self.drain_u8() as u64) << 16;
+        result |= (self.drain_u8() as u64) << 8;
+        result |= self.drain_u8() as u64;
         result
     }
 
+    #[inline]
     pub fn drain_i8(&mut self) -> i8 {
-        self.data.remove(0) as i8
+        self.drain_u8() as i8
     }
 
+    #[inline]
     pub fn drain_i16(&mut self) -> i16 {
         let mut result = 0;
-        result |= (self.data.remove(0) as i16) << 8;
-        result |= self.data.remove(0) as i16;
+        result |= (self.drain_u8() as i16) << 8;
+        result |= self.drain_u8() as i16;
         result
     }
 
+    #[inline]
     pub fn drain_i24(&mut self) -> i32 {
         let mut result = 0;
-        result |= (self.data.remove(0) as i32) << 16;
-        result |= (self.data.remove(0) as i32) << 8;
-        result |= self.data.remove(0) as i32;
+        result |= (self.drain_u8() as i32) << 16;
+        result |= (self.drain_u8() as i32) << 8;
+        result |= self.drain_u8() as i32;
         result
     }
 
+    #[inline]
     pub fn drain_i32(&mut self) -> i32 {
         let mut result = 0;
-        result |= (self.data.remove(0) as i32) << 24;
-        result |= (self.data.remove(0) as i32) << 16;
-        result |= (self.data.remove(0) as i32) << 8;
-        result |= self.data.remove(0) as i32;
+        result |= (self.drain_u8() as i32) << 24;
+        result |= (self.drain_u8() as i32) << 16;
+        result |= (self.drain_u8() as i32) << 8;
+        result |= self.drain_u8() as i32;
         result
     }
 
+    #[inline]
     pub fn drain_i64(&mut self) -> i64 {
         let mut result = 0;
-        result |= (self.data.remove(0) as i64) << 56;
-        result |= (self.data.remove(0) as i64) << 48;
-        result |= (self.data.remove(0) as i64) << 40;
-        result |= (self.data.remove(0) as i64) << 32;
-        result |= (self.data.remove(0) as i64) << 24;
-        result |= (self.data.remove(0) as i64) << 16;
-        result |= (self.data.remove(0) as i64) << 8;
-        result |= self.data.remove(0) as i64;
+        result |= (self.drain_u8() as i64) << 56;
+        result |= (self.drain_u8() as i64) << 48;
+        result |= (self.drain_u8() as i64) << 40;
+        result |= (self.drain_u8() as i64) << 32;
+        result |= (self.drain_u8() as i64) << 24;
+        result |= (self.drain_u8() as i64) << 16;
+        result |= (self.drain_u8() as i64) << 8;
+        result |= self.drain_u8() as i64;
         result
     }
 
+    #[inline]
     pub fn drain_f64(&mut self) -> f64 {
         let mut result = 0;
-        result |= (self.data.remove(0) as u64) << 56;
-        result |= (self.data.remove(0) as u64) << 48;
-        result |= (self.data.remove(0) as u64) << 40;
-        result |= (self.data.remove(0) as u64) << 32;
-        result |= (self.data.remove(0) as u64) << 24;
-        result |= (self.data.remove(0) as u64) << 16;
-        result |= (self.data.remove(0) as u64) << 8;
-        result |= self.data.remove(0) as u64;
+        result |= (self.drain_u8() as u64) << 56;
+        result |= (self.drain_u8() as u64) << 48;
+        result |= (self.drain_u8() as u64) << 40;
+        result |= (self.drain_u8() as u64) << 32;
+        result |= (self.drain_u8() as u64) << 24;
+        result |= (self.drain_u8() as u64) << 16;
+        result |= (self.drain_u8() as u64) << 8;
+        result |= self.drain_u8() as u64;
         f64::from_bits(result)
     }
 
+    #[inline]
     pub fn drain_f64_le(&mut self) -> f64 {
         let mut result = 0;
-        result |= self.data.remove(0) as u64;
-        result |= (self.data.remove(0) as u64) << 8;
-        result |= (self.data.remove(0) as u64) << 16;
-        result |= (self.data.remove(0) as u64) << 24;
-        result |= (self.data.remove(0) as u64) << 32;
-        result |= (self.data.remove(0) as u64) << 40;
-        result |= (self.data.remove(0) as u64) << 48;
-        result |= (self.data.remove(0) as u64) << 56;
+        result |= self.drain_u8() as u64;
+        result |= (self.drain_u8() as u64) << 8;
+        result |= (self.drain_u8() as u64) << 16;
+        result |= (self.drain_u8() as u64) << 24;
+        result |= (self.drain_u8() as u64) << 32;
+        result |= (self.drain_u8() as u64) << 40;
+        result |= (self.drain_u8() as u64) << 48;
+        result |= (self.drain_u8() as u64) << 56;
         f64::from_bits(result)
     }
 
+    #[inline]
     pub fn drain_f32_le(&mut self) -> f32 {
         let mut result = 0;
-        result |= self.data.remove(0) as u32;
-        result |= (self.data.remove(0) as u32) << 8;
-        result |= (self.data.remove(0) as u32) << 16;
-        result |= (self.data.remove(0) as u32) << 24;
+        result |= self.drain_u8() as u32;
+        result |= (self.drain_u8() as u32) << 8;
+        result |= (self.drain_u8() as u32) << 16;
+        result |= (self.drain_u8() as u32) << 24;
         f32::from_bits(result)
     }
 
+    #[inline]
     pub fn drain_f32(&mut self) -> f32 {
         let mut result = 0;
-        result |= (self.data.remove(0) as u32) << 24;
-        result |= (self.data.remove(0) as u32) << 16;
-        result |= (self.data.remove(0) as u32) << 8;
-        result |= self.data.remove(0) as u32;
+        result |= (self.drain_u8() as u32) << 24;
+        result |= (self.drain_u8() as u32) << 16;
+        result |= (self.drain_u8() as u32) << 8;
+        result |= self.drain_u8() as u32;
         f32::from_bits(result)
     }
 
@@ -210,6 +230,7 @@ impl Decoder {
         )
     }
 
+    #[inline]
     pub fn concat_ts(ts: u32, ts_ext: u8) -> u32 {
         (ts & 0x00FFFFFFu32) | ((ts_ext as u32) << 24)
     }
@@ -281,18 +302,29 @@ impl Decoder {
     }
 
     pub fn decode_body(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let mut dbg_cnt = 0;
+        const HEADER_SIZE: u32 = 11;
+
+        let mut dbg_cnt = 0; // todo: this shall be removed.
+        let debugging = true;
+
         loop {
-            if self.data.is_empty() || dbg_cnt > 10 {
+            if debugging {
+                if dbg_cnt > 100 {
+                    break;
+                }
+                dbg_cnt += 1;
+            }
+
+            if self.data.is_empty() {
                 break;
             }
-            dbg_cnt += 1;
+
             let previous_tag_size = self.drain_u32();
             dbg!(previous_tag_size);
             if previous_tag_size == self.previous_tag_size {
                 let tag = self.decode_tag()?;
-                dbg!(tag.data_size + 11);
-                self.previous_tag_size = tag.data_size + 11;
+                dbg!(tag.data_size + HEADER_SIZE);
+                self.previous_tag_size = tag.data_size + HEADER_SIZE;
 
                 dbg!(tag);
                 // todo: send tag to demuxer.

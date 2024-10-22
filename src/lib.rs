@@ -8,6 +8,7 @@ pub fn add(left: u64, right: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::VecDeque;
     use crate::flv::decoder::Decoder;
     use super::*;
 
@@ -77,6 +78,7 @@ mod tests {
         let core = core::Core::new();
         let mut buf = std::fs::read("D:/test.flv").unwrap();
         // dbg!(buf[0..64].to_vec());
+        let mut buf: VecDeque<u8> = buf.into_iter().collect();
         core.borrow_mut().push_data(&mut buf);
         core.borrow_mut().start_decoding();
     }

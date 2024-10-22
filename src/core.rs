@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::rc::Rc;
 use crate::flv::decoder::Decoder;
 use crate::flv::demuxer::Demuxer;
@@ -15,12 +16,12 @@ impl Core {
             flv_demuxer: None,
         };
         let core = Rc::new(RefCell::new(core));
-        core.borrow_mut().flv_decoder = Some(Rc::new(RefCell::from(Decoder::new(vec![], core.clone()))));
+        core.borrow_mut().flv_decoder = Some(Rc::new(RefCell::from(Decoder::new(VecDeque::new(), core.clone()))));
         core.borrow_mut().flv_demuxer = Some(Rc::new(RefCell::from(Demuxer::new(core.clone()))));
         core
     }
 
-    pub fn push_data(&self, data: &mut Vec<u8>) {
+    pub fn push_data(&self, data: &mut VecDeque<u8>) {
         self.flv_decoder
             .clone()
             .unwrap()

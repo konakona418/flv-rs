@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter};
 use crate::flv::header::{EncryptionTagHeader, FilterParameters, TagHeader};
 use crate::flv::script::{ScriptData, ScriptTagBody};
 
@@ -30,12 +31,38 @@ pub enum TagBody {
     Encrypted(EncryptedTagBody),
 }
 
-#[derive(Debug)]
 pub enum NormalTagBody {
     Audio(Vec<u8>),
     Video(Vec<u8>),
     Script(ScriptTagBody),
     Placeholder, // todo: temporary
+}
+
+impl Debug for NormalTagBody {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NormalTagBody::Audio(data) => {
+                f.debug_struct("Audio")
+                    .field("data_size", &data.len())
+                    .finish()
+            }
+            NormalTagBody::Video(data) => {
+                f.debug_struct("Video")
+                    .field("data_size", &data.len())
+                    .finish()
+            }
+            NormalTagBody::Script(data) => {
+                f.debug_struct("Script")
+                   .field("data_size", &data.value.length)
+                    .finish()
+            }
+            _ => {
+                f.debug_struct("Placeholder")
+                    .field("data_size", &0)
+                    .finish()
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
