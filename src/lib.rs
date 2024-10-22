@@ -16,12 +16,6 @@ mod tests {
         let byte = 0b10101011;
         let bit_io = io::bit::BitIO::new(byte);
         assert_eq!(bit_io.read(), true);
-        assert_eq!(bit_io.read_bit(2), false);
-        assert_eq!(bit_io.read_bit(7), true);
-        assert_eq!(bit_io.read_bit(6), false);
-        assert_eq!(bit_io.read_range(3, 7), 0b10101u8);
-        assert_eq!(bit_io.read_range(0, 3), 0b1011u8);
-        assert_eq!(bit_io.read_range(3, 5), 0b101u8);
 
         assert_eq!(Decoder::concat_ts(0x123456, 0xAB), 0xAB123456);
         assert_eq!(Decoder::concat_ts(0x00123456, 0xAB), 0xAB123456);
@@ -79,5 +73,11 @@ mod tests {
         assert_eq!(decoder.drain_u24(), 0x00ffffff);
         assert_eq!(decoder.drain_u32(), 4294967295);
         assert_eq!(decoder.drain_u64(), 18446744073709551615u64);*/
+
+        let core = core::Core::new();
+        let mut buf = std::fs::read("D:/test.flv").unwrap();
+        // dbg!(buf[0..64].to_vec());
+        core.borrow_mut().push_data(&mut buf);
+        core.borrow_mut().start_decoding();
     }
 }

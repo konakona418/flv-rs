@@ -19,5 +19,21 @@ impl Core {
         core.borrow_mut().flv_demuxer = Some(Rc::new(RefCell::from(Demuxer::new(core.clone()))));
         core
     }
+
+    pub fn push_data(&self, data: &mut Vec<u8>) {
+        self.flv_decoder
+            .clone()
+            .unwrap()
+            .borrow_mut()
+            .push_data(data)
+    }
+
+    pub fn start_decoding(&self) {
+        // todo: decode header
+        let header = self.flv_decoder.clone().unwrap().borrow_mut().decode_header().unwrap();
+        dbg!(header);
+        // todo: decode body
+        self.flv_decoder.clone().unwrap().borrow_mut().decode_body().unwrap();
+    }
 }
 

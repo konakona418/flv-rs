@@ -1,6 +1,7 @@
 use crate::flv::header::{EncryptionTagHeader, FilterParameters, TagHeader};
 use crate::flv::script::{ScriptData, ScriptTagBody};
 
+#[derive(Debug)]
 pub struct Tag {
     pub filter: bool,
     pub tag_type: TagType,
@@ -15,6 +16,7 @@ pub struct Tag {
     pub tag_body: TagBody,
 }
 
+#[derive(Debug)]
 pub enum TagType {
     Audio,
     Video,
@@ -22,11 +24,13 @@ pub enum TagType {
     Encryption,
 }
 
+#[derive(Debug)]
 pub enum TagBody {
     Normal(NormalTagBody),
     Encrypted(EncryptedTagBody),
 }
 
+#[derive(Debug)]
 pub enum NormalTagBody {
     Audio(Vec<u8>),
     Video(Vec<u8>),
@@ -34,6 +38,7 @@ pub enum NormalTagBody {
     Placeholder, // todo: temporary
 }
 
+#[derive(Debug)]
 pub enum EncryptedTagBody {
     Audio(Vec<u8>),
     Video(Vec<u8>),

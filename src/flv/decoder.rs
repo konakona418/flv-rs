@@ -1,11 +1,10 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use crate::core::Core;
-use crate::flv::demuxer::Demuxer;
 use crate::flv::header::{AudioTagHeader, EncryptionTagHeader, FilterParameters, FlvHeader, TagHeader, VideoTagHeader};
 use crate::flv::script::ScriptTagBody;
 use crate::flv::tag::{EncryptedTagBody, NormalTagBody, Tag, TagBody, TagType};
 use crate::io::bit::BitIO;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub struct Decoder {
     data: Vec<u8>,
@@ -43,11 +42,8 @@ impl Decoder {
     }
 
     pub fn drain_bytes_vec(&mut self, size: usize) -> Vec<u8> {
-        let mut result = Vec::with_capacity(size);
-        for _ in 0..size {
-            result.push(self.data.remove(0));
-        }
-        result
+        let drained = self.data.drain(0..size).collect::<Vec<_>>();
+        drained
     }
 
     pub fn drain_u16_le(&mut self) -> u16 {
@@ -202,7 +198,7 @@ impl Decoder {
         let bits = BitIO::new(self.drain_u8());
         let has_audio = bits.read_bit(5);
         let has_video = bits.read_bit(7);
-        let data_offset = self.drain_u32_le();
+        let data_offset = self.drain_u32();
         Ok(
             FlvHeader::new(
                 signature,
@@ -285,15 +281,20 @@ impl Decoder {
     }
 
     pub fn decode_body(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let mut dbg_cnt = 0;
         loop {
-            if self.data.is_empty() {
+            if self.data.is_empty() || dbg_cnt > 10 {
                 break;
             }
+            dbg_cnt += 1;
             let previous_tag_size = self.drain_u32();
+            dbg!(previous_tag_size);
             if previous_tag_size == self.previous_tag_size {
                 let tag = self.decode_tag()?;
-                self.previous_tag_size = tag.data_size + 11
+                dbg!(tag.data_size + 11);
+                self.previous_tag_size = tag.data_size + 11;
 
+                dbg!(tag);
                 // todo: send tag to demuxer.
             } else {
                 return Err(

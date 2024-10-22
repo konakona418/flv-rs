@@ -1,6 +1,7 @@
 use crate::flv::decoder::Decoder;
 use crate::io::bit::BitIO;
 
+#[derive(Debug)]
 pub struct FlvHeader {
     pub signature: [u8; 3],
     pub version: u8,
@@ -15,6 +16,7 @@ impl FlvHeader {
     }
 }
 
+#[derive(Debug)]
 pub enum TagHeader {
     Audio(AudioTagHeader),
     Video(VideoTagHeader),
@@ -22,6 +24,7 @@ pub enum TagHeader {
     Placeholder,
 }
 
+#[derive(Debug)]
 pub struct AudioTagHeader {
     // UB4
     pub sound_format: u8,
@@ -59,6 +62,7 @@ impl AudioTagHeader {
     }
 }
 
+#[derive(Debug)]
 pub struct VideoTagHeader {
     // UB4
     pub frame_type: u8,
@@ -96,6 +100,7 @@ impl VideoTagHeader {
     }
 }
 
+#[derive(Debug)]
 pub struct EncryptionTagHeader {
     // todo: encryption
 }
@@ -106,15 +111,18 @@ impl EncryptionTagHeader {
     }
 }
 
+#[derive(Debug)]
 pub enum FilterParameters {
     EncryptionFilter(EncryptionFilterParameters),
     SelectiveEncryptionFilter(SelectiveEncryptionFilterParameters),
 }
 
+#[derive(Debug)]
 pub struct EncryptionFilterParameters {
     // todo: encryption
 }
 
+#[derive(Debug)]
 pub struct SelectiveEncryptionFilterParameters {
     // todo: selective encryption
 }
