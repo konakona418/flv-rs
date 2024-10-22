@@ -147,13 +147,10 @@ impl ScriptDataEcmaArray {
         for _ in 0..length {
             let key = ScriptDataString::parse(data)?;
             let data = parse_object(data)?;
-            if let ScriptData::ObjectEndMarker = data {
-                properties.push(ScriptDataObjectProp { name: key, value: data });
-                break;
-            } else {
-                properties.push(ScriptDataObjectProp { name: key, value: data });
-            }
+            properties.push(ScriptDataObjectProp { name: key, value: data });
         }
+        // todo: is the last elem of the ecma array the 'end marker'?
+
         Ok(ScriptDataEcmaArray { length, properties })
     }
 }

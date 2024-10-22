@@ -1,5 +1,6 @@
 use crate::flv::header::FlvHeader;
-use crate::flv::tag::Tag;
+use crate::flv::tag::{Tag, TagType};
+use crate::flv::tag::TagType::Video;
 use crate::io::bit::BitIO;
 
 pub struct Decoder {
@@ -13,6 +14,14 @@ impl Decoder {
             data,
             previous_tag_size: 0
         }
+    }
+
+    pub fn push_data(&mut self, data: &mut Vec<u8>) {
+        self.data.append(data);
+    }
+
+    pub fn push_bytes(&mut self, bytes: &[u8]) {
+        self.data.extend_from_slice(bytes);
     }
 
     pub fn drain_u8(&mut self) -> u8 {
@@ -83,6 +92,60 @@ impl Decoder {
         result
     }
 
+    pub fn drain_u64(&mut self) -> u64 {
+        let mut result = 0;
+        result |= (self.data.remove(0) as u64) << 56;
+        result |= (self.data.remove(0) as u64) << 48;
+        result |= (self.data.remove(0) as u64) << 40;
+        result |= (self.data.remove(0) as u64) << 32;
+        result |= (self.data.remove(0) as u64) << 24;
+        result |= (self.data.remove(0) as u64) << 16;
+        result |= (self.data.remove(0) as u64) << 8;
+        result |= self.data.remove(0) as u64;
+        result
+    }
+
+    pub fn drain_i8(&mut self) -> i8 {
+        self.data.remove(0) as i8
+    }
+
+    pub fn drain_i16(&mut self) -> i16 {
+        let mut result = 0;
+        result |= (self.data.remove(0) as i16) << 8;
+        result |= self.data.remove(0) as i16;
+        result
+    }
+
+    pub fn drain_i24(&mut self) -> i32 {
+        let mut result = 0;
+        result |= (self.data.remove(0) as i32) << 16;
+        result |= (self.data.remove(0) as i32) << 8;
+        result |= self.data.remove(0) as i32;
+        result
+    }
+
+    pub fn drain_i32(&mut self) -> i32 {
+        let mut result = 0;
+        result |= (self.data.remove(0) as i32) << 24;
+        result |= (self.data.remove(0) as i32) << 16;
+        result |= (self.data.remove(0) as i32) << 8;
+        result |= self.data.remove(0) as i32;
+        result
+    }
+
+    pub fn drain_i64(&mut self) -> i64 {
+        let mut result = 0;
+        result |= (self.data.remove(0) as i64) << 56;
+        result |= (self.data.remove(0) as i64) << 48;
+        result |= (self.data.remove(0) as i64) << 40;
+        result |= (self.data.remove(0) as i64) << 32;
+        result |= (self.data.remove(0) as i64) << 24;
+        result |= (self.data.remove(0) as i64) << 16;
+        result |= (self.data.remove(0) as i64) << 8;
+        result |= self.data.remove(0) as i64;
+        result
+    }
+
     pub fn drain_f64(&mut self) -> f64 {
         let mut result = 0;
         result |= (self.data.remove(0) as u64) << 56;
@@ -145,14 +208,27 @@ impl Decoder {
         )
     }
 
-    pub fn decode_tag(&mut self) -> Result<Tag, Box<dyn std::error::Error>> {
+    pub fn concat_ts(ts: u32, ts_ext: u8) -> u32 {
+        (ts & 0x00FFFFFFu32) | ((ts_ext as u32) << 24)
+    }
+
+    pub fn decode_tag(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let bit = BitIO::new(self.drain_u8());
         let filter = bit.read_bit(2);
-        let tag_type = bit.read_range(3, 7);
+        let tag_type = TagType::from(bit.read_range(3, 7))?;
+
         let data_size = self.drain_u24();
+
         let timestamp = self.drain_u24();
         let timestamp_extended = self.drain_u8();
-        let stream_id = self.drain_u24();
+        let ts_concatenated = Self::concat_ts(timestamp, timestamp_extended);
+
+        let stream_id = self.drain_u24(); // always 0.
+
+        if filter {
+            // todo: handle encryption tag header
+            // todo: handle filter parameters
+        }
         Ok(())
     }
 
