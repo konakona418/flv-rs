@@ -7,14 +7,14 @@ pub fn parse_object(data: &mut Decoder) -> Result<ScriptData, Box<dyn std::error
         0 => ScriptData::Number(data.drain_f64()),
         1 => ScriptData::Boolean(data.drain_u8()),
         2 => ScriptData::String(ScriptDataString::parse_no_marker(data)?),
-        3 => ScriptData::Object(ScriptDataObject::parse(data)?),
+        3 => ScriptData::Object(ScriptDataObject::parse_no_marker(data)?),
 
         7 => ScriptData::Reference(data.drain_u16()),
         8 => ScriptData::EcmaArray(ScriptDataEcmaArray::parse_no_marker(data)?),
         9 => ScriptData::ObjectEndMarker,
         10 => ScriptData::StrictArray(ScriptStrictArray::parse_no_marker(data)?),
-        11 => ScriptData::Date(ScriptDataDate::parse(data)?),
-        12 => ScriptData::LongString(ScriptDataLongString::parse(data)?),
+        11 => ScriptData::Date(ScriptDataDate::parse_no_marker(data)?),
+        12 => ScriptData::LongString(ScriptDataLongString::parse_no_marker(data)?),
         _ => {
             println!("Reserved type {}.", data_type);
             ScriptData::NotImplemented
@@ -61,7 +61,22 @@ pub struct ScriptDataObject {
 }
 
 impl ScriptDataObject {
+
     pub fn parse(data: &mut Decoder) -> Result<ScriptDataObject, Box<dyn std::error::Error>> {
+        let type_marker = data.drain_u8();
+        if type_marker != 3 {
+            return Err(
+                Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Unable to parse object: Expected type marker Object(3), found something else.",
+                ).into()
+            );
+        }
+
+        ScriptDataObject::parse_no_marker(data)
+    }
+
+    pub fn parse_no_marker(data: &mut Decoder) -> Result<ScriptDataObject, Box<dyn std::error::Error>> {
         let mut properties = Vec::new();
         loop {
             let key = ScriptDataString::parse_no_marker(data)?;
@@ -226,6 +241,11 @@ impl ScriptDataDate {
                 ).into()
             );
         }
+
+        Self::parse_no_marker(data)
+    }
+
+    pub fn parse_no_marker(data: &mut Decoder) -> Result<ScriptDataDate, Box<dyn std::error::Error>> {
         let date = data.drain_f64();
         let local_time_offset = data.drain_i16();
         Ok(ScriptDataDate { date, local_time_offset })

@@ -53,7 +53,8 @@ impl Debug for NormalTagBody {
             }
             NormalTagBody::Script(data) => {
                 f.debug_struct("Script")
-                   .field("data_size", &data.value.length)
+                    .field("data_size", &data.value.length)
+                    .field("data", &data.value.properties)
                     .finish()
             }
             _ => {

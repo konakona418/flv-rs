@@ -30,11 +30,10 @@ impl Core {
     }
 
     pub fn start_decoding(&self) {
-        // todo: decode header
         let header = self.flv_decoder.clone().unwrap().borrow_mut().decode_header().unwrap();
         dbg!(header);
-        // todo: decode body
         self.flv_decoder.clone().unwrap().borrow_mut().decode_body().unwrap();
+        // todo: when the video stream is chunked, it's necessary to 'wait' for the next chunk than simply break the decoder loop.
     }
 }
 

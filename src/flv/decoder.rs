@@ -261,12 +261,10 @@ impl Decoder {
             TagBody::Normal(match tag_type {
                 TagType::Audio => {
                     tag_header = TagHeader::Audio(AudioTagHeader::parse(self, &mut header_size)?);
-                    // todo: untested
                     NormalTagBody::Audio(self.drain_bytes_vec((data_size as usize) - header_size))
                 }
                 TagType::Video => {
                     tag_header = TagHeader::Video(VideoTagHeader::parse(self, &mut header_size)?);
-                    // todo: untested
                     NormalTagBody::Video(self.drain_bytes_vec((data_size as usize) - header_size))
                 }
                 TagType::Script => {
@@ -305,28 +303,29 @@ impl Decoder {
         const HEADER_SIZE: u32 = 11;
 
         let mut dbg_cnt = 0; // todo: this shall be removed.
-        let debugging = true;
+        const DEBUGGING: bool = false;
 
         loop {
-            if debugging {
+            if DEBUGGING {
                 if dbg_cnt > 100 {
                     break;
                 }
                 dbg_cnt += 1;
             }
 
+            let previous_tag_size = self.drain_u32();
+
             if self.data.is_empty() {
                 break;
             }
 
-            let previous_tag_size = self.drain_u32();
-            dbg!(previous_tag_size);
+            //dbg!(previous_tag_size);
             if previous_tag_size == self.previous_tag_size {
                 let tag = self.decode_tag()?;
-                dbg!(tag.data_size + HEADER_SIZE);
+                //dbg!(tag.data_size + HEADER_SIZE);
                 self.previous_tag_size = tag.data_size + HEADER_SIZE;
 
-                dbg!(tag);
+                // dbg!(tag);
                 // todo: send tag to demuxer.
             } else {
                 return Err(
