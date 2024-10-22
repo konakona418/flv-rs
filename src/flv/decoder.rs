@@ -1,18 +1,24 @@
-use crate::flv::header::FlvHeader;
-use crate::flv::tag::{Tag, TagType};
-use crate::flv::tag::TagType::Video;
+use std::cell::RefCell;
+use std::rc::Rc;
+use crate::core::Core;
+use crate::flv::demuxer::Demuxer;
+use crate::flv::header::{AudioTagHeader, EncryptionTagHeader, FilterParameters, FlvHeader, TagHeader, VideoTagHeader};
+use crate::flv::script::ScriptTagBody;
+use crate::flv::tag::{EncryptedTagBody, NormalTagBody, Tag, TagBody, TagType};
 use crate::io::bit::BitIO;
 
 pub struct Decoder {
     data: Vec<u8>,
-    previous_tag_size: u32
+    previous_tag_size: u32,
+    core: Rc<RefCell<Core>>
 }
 
 impl Decoder {
-    pub fn new(data: Vec<u8>) -> Self {
+    pub fn new(data: Vec<u8>, core: Rc<RefCell<Core>>) -> Self {
         Decoder {
             data,
-            previous_tag_size: 0
+            previous_tag_size: 0,
+            core,
         }
     }
 
@@ -203,7 +209,7 @@ impl Decoder {
                 version,
                 has_audio,
                 has_video,
-                data_offset
+                data_offset,
             )
         )
     }
@@ -212,7 +218,7 @@ impl Decoder {
         (ts & 0x00FFFFFFu32) | ((ts_ext as u32) << 24)
     }
 
-    pub fn decode_tag(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn decode_tag(&mut self) -> Result<Tag, Box<dyn std::error::Error>> {
         let bit = BitIO::new(self.drain_u8());
         let filter = bit.read_bit(2);
         let tag_type = TagType::from(bit.read_range(3, 7))?;
@@ -225,19 +231,80 @@ impl Decoder {
 
         let stream_id = self.drain_u24(); // always 0.
 
-        if filter {
+        // Note: all the elements before stream_id made up for 11 bytes in total.
+        //
+
+        let mut encryption_header = None;
+        let mut filter_params = None;
+
+        let mut header_size: usize = 0;
+
+        let tag_header: TagHeader;
+        let tag_body = if !filter {
+            TagBody::Normal(match tag_type {
+                TagType::Audio => {
+                    tag_header = TagHeader::Audio(AudioTagHeader::parse(self, &mut header_size)?);
+                    // todo: untested
+                    NormalTagBody::Audio(self.drain_bytes_vec((data_size as usize) - header_size))
+                }
+                TagType::Video => {
+                    tag_header = TagHeader::Video(VideoTagHeader::parse(self, &mut header_size)?);
+                    // todo: untested
+                    NormalTagBody::Video(self.drain_bytes_vec((data_size as usize) - header_size))
+                }
+                TagType::Script => {
+                    tag_header = TagHeader::Script;
+                    NormalTagBody::Script(ScriptTagBody::parse(self)?)
+                }
+                _ => {
+                    return Err(Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid tag type")));
+                }
+            })
+        } else {
             // todo: handle encryption tag header
             // todo: handle filter parameters
-        }
-        Ok(())
+            tag_header = TagHeader::Placeholder;
+            encryption_header = Some(EncryptionTagHeader::parse(self, &mut header_size)?);
+            filter_params = Some(FilterParameters::parse(self, &mut header_size)?);
+            TagBody::Encrypted(EncryptedTagBody::Placeholder)
+        };
+
+        Ok(Tag::new(
+            filter,
+            tag_type,
+            data_size,
+            timestamp,
+            timestamp_extended,
+            ts_concatenated,
+            stream_id,
+            tag_header,
+            tag_body,
+            encryption_header,
+            filter_params,
+        ))
     }
 
     pub fn decode_body(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if self.previous_tag_size != 0 {
-            self.previous_tag_size = self.drain_u32_le();
-        } else {
-            // Skip first previous tag size
-            self.drain_u32_le();
+        loop {
+            if self.data.is_empty() {
+                break;
+            }
+            let previous_tag_size = self.drain_u32();
+            if previous_tag_size == self.previous_tag_size {
+                let tag = self.decode_tag()?;
+                self.previous_tag_size = tag.data_size + 11
+
+                // todo: send tag to demuxer.
+            } else {
+                return Err(
+                    Box::new(
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidData, 
+                            format!("Tag size mismatch: expected {}, read {}.", previous_tag_size, self.previous_tag_size)
+                        )
+                    )
+                );
+            }
         }
         Ok(())
     }

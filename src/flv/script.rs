@@ -1,5 +1,5 @@
-use std::io::Error;
 use crate::flv::decoder::Decoder;
+use std::io::Error;
 
 pub fn parse_object(data: &mut Decoder) -> Result<ScriptData, Box<dyn std::error::Error>> {
     let data_type = data.drain_u8();
@@ -18,7 +18,7 @@ pub fn parse_object(data: &mut Decoder) -> Result<ScriptData, Box<dyn std::error
         _ => {
             println!("Reserved type {}.", data_type);
             ScriptData::NotImplemented
-        },
+        }
     };
     Ok(value)
 }
@@ -91,7 +91,7 @@ impl ScriptDataString {
             return Err(
                 Error::new(
                     std::io::ErrorKind::InvalidData,
-                    format!("Unable to parse string: Expected type marker String(2), found {}.", type_marker)
+                    format!("Unable to parse string: Expected type marker String(2), found {}.", type_marker),
                 ).into()
             );
         }
@@ -114,9 +114,9 @@ impl ScriptDataLongString {
             return Err(
                 Error::new(
                     std::io::ErrorKind::InvalidData,
-                    format!("Unable to parse long string: Expected type marker LongString(12), found {}.", type_marker)
+                    format!("Unable to parse long string: Expected type marker LongString(12), found {}.", type_marker),
                 ).into()
-           );
+            );
         }
         let length = data.drain_u32();
         let data = data.drain_bytes_vec(length as usize).into_iter().collect::<Vec<_>>();
@@ -137,7 +137,7 @@ impl ScriptDataEcmaArray {
             return Err(
                 Error::new(
                     std::io::ErrorKind::InvalidData,
-                    format!("Unable to parse ecma array: Expected type marker EcmaArray(8), found {}.", type_marker)
+                    format!("Unable to parse ecma array: Expected type marker EcmaArray(8), found {}.", type_marker),
                 ).into()
             );
         }
@@ -167,7 +167,7 @@ impl ScriptStrictArray {
             return Err(
                 Error::new(
                     std::io::ErrorKind::InvalidData,
-                    format!("Unable to parse strict array: Expected type marker StrictArray(10), found {}.", type_marker)
+                    format!("Unable to parse strict array: Expected type marker StrictArray(10), found {}.", type_marker),
                 ).into()
             );
         }
@@ -181,7 +181,7 @@ impl ScriptStrictArray {
     }
 }
 
- pub struct ScriptDataDate {
+pub struct ScriptDataDate {
     pub date: f64,
     pub local_time_offset: i16,
 }
@@ -193,7 +193,7 @@ impl ScriptDataDate {
             return Err(
                 Error::new(
                     std::io::ErrorKind::InvalidData,
-                    format!("Unable to parse date: Expected type marker Date(11), found {}.", type_marker)
+                    format!("Unable to parse date: Expected type marker Date(11), found {}.", type_marker),
                 ).into()
             );
         }
