@@ -6,19 +6,40 @@ use crate::io::bit::BitIO;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
+use std::sync::mpsc;
+use crate::exchange::{Destination, ExchangeRegistrable, Packed, PackedContent};
 
 pub struct Decoder {
     data: VecDeque<u8>,
     previous_tag_size: u32,
-    core: Rc<RefCell<Core>>
+    channel_exchange: Option<mpsc::Sender<Packed>>,
+    channel_receiver: mpsc::Receiver<PackedContent>,
+    channel_sender: mpsc::Sender<PackedContent>,
+}
+
+impl ExchangeRegistrable for Decoder {
+    fn set_exchange(&mut self, sender: mpsc::Sender<Packed>) {
+        self.channel_exchange = Some(sender);
+    }
+
+    fn get_sender(&self) -> mpsc::Sender<PackedContent> {
+        self.channel_sender.clone()
+    }
+
+    fn get_self_as_destination(&self) -> Destination {
+        Destination::Decoder
+    }
 }
 
 impl Decoder {
     pub fn new(data: VecDeque<u8>, core: Rc<RefCell<Core>>) -> Self {
+        let (channel_sender, channel_receiver) = mpsc::channel();
         Decoder {
             data,
             previous_tag_size: 0,
-            core,
+            channel_exchange: None,
+            channel_receiver,
+            channel_sender,
         }
     }
 
@@ -339,5 +360,9 @@ impl Decoder {
             }
         }
         Ok(())
+    }
+
+    pub fn launch_worker_thread(&mut self) {
+        // todo: launch a thread that will read from the stream and send the data to the demuxer.
     }
 }

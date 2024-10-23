@@ -1,6 +1,7 @@
 mod flv;
 mod io;
 mod core;
+mod exchange;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
@@ -79,7 +80,7 @@ mod tests {
         let mut buf = std::fs::read("D:/test.flv").unwrap();
         // dbg!(buf[0..64].to_vec());
         let mut buf: VecDeque<u8> = buf.into_iter().collect();
-        core.borrow_mut().push_data(&mut buf);
+        core.borrow_mut().push_data_to_decoder(&mut buf);
         core.borrow_mut().start_decoding();
     }
 }
