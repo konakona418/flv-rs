@@ -78,9 +78,11 @@ mod tests {
 
         let core = core::Core::new();
         let mut buf = std::fs::read("D:/test.flv").unwrap();
-        // dbg!(buf[0..64].to_vec());
-        let mut buf: VecDeque<u8> = buf.into_iter().collect();
-        core.borrow_mut().push_data_to_decoder(&mut buf);
-        core.borrow_mut().start_decoding();
+        let mut decoder = Decoder::new(VecDeque::from(buf));
+        dbg!(decoder.decode_header().unwrap());
+        dbg!(decoder.decode_body().unwrap());
+
+        // Note: by the way, till this commit, the decoder (especially the AAC part)
+        // works quite well in single thread mode and in unit tests.
     }
 }

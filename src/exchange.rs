@@ -1,6 +1,8 @@
 use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 use std::sync::mpsc;
+use crate::flv::header::FlvHeader;
+use crate::flv::tag::Tag;
 
 pub struct Exchange {
     receiver: mpsc::Receiver<Packed>,
@@ -124,6 +126,6 @@ pub enum PackedContentToDecoder {
 }
 
 pub enum PackedContentToDemuxer {
-    Data,
-    Command
+    PushTag(Tag),
+    PushFlvHeader(FlvHeader)
 }

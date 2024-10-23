@@ -1,13 +1,12 @@
-use crate::core::Core;
+use crate::exchange::{Destination, ExchangeRegistrable, Packed, PackedContent, PackedContentToDemuxer, PackedRouting};
 use crate::flv::header::{AudioTagHeader, EncryptionTagHeader, FilterParameters, FlvHeader, TagHeader, VideoTagHeader};
 use crate::flv::script::ScriptTagBody;
 use crate::flv::tag::{EncryptedTagBody, NormalTagBody, Tag, TagBody, TagType};
 use crate::io::bit::BitIO;
-use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::rc::Rc;
 use std::sync::mpsc;
-use crate::exchange::{Destination, ExchangeRegistrable, Packed, PackedContent};
+use std::thread;
+use std::thread::JoinHandle;
 
 pub struct Decoder {
     data: VecDeque<u8>,
@@ -32,7 +31,7 @@ impl ExchangeRegistrable for Decoder {
 }
 
 impl Decoder {
-    pub fn new(data: VecDeque<u8>, core: Rc<RefCell<Core>>) -> Self {
+    pub fn new(data: VecDeque<u8>) -> Self {
         let (channel_sender, channel_receiver) = mpsc::channel();
         Decoder {
             data,
@@ -346,8 +345,9 @@ impl Decoder {
                 //dbg!(tag.data_size + HEADER_SIZE);
                 self.previous_tag_size = tag.data_size + HEADER_SIZE;
 
-                // dbg!(tag);
+                // dbg!(&tag);
                 // todo: send tag to demuxer.
+                self.send_tag_to_demuxer(tag)?;
             } else {
                 return Err(
                     Box::new(
@@ -362,7 +362,47 @@ impl Decoder {
         Ok(())
     }
 
-    pub fn launch_worker_thread(&mut self) {
-        // todo: launch a thread that will read from the stream and send the data to the demuxer.
+    fn send_to_demuxer(&mut self, pack: Packed) -> Result<(), Box<dyn std::error::Error>> {
+        if let Err(e) = self.channel_exchange
+            .clone()
+            .unwrap()
+            .send(pack) {
+            Err(Box::new(e))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn send_tag_to_demuxer(&mut self, tag: Tag) -> Result<(), Box<dyn std::error::Error>> {
+        let pack: Packed = Packed {
+            packed_routing: PackedRouting::ToDemuxer,
+            packed_content: PackedContent::ToDemuxer(PackedContentToDemuxer::PushTag(tag)),
+        };
+        self.send_to_demuxer(pack)
+    }
+
+    fn send_header_to_demuxer(&mut self, flv_header: FlvHeader) -> Result<(), Box<dyn std::error::Error>> {
+        let pack: Packed = Packed {
+            packed_routing: PackedRouting::ToDemuxer,
+            packed_content: PackedContent::ToDemuxer(PackedContentToDemuxer::PushFlvHeader(flv_header)),
+        };
+        self.send_to_demuxer(pack)
+    }
+
+    fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let flv_header = self.decode_header()?;
+        self.send_header_to_demuxer(flv_header)?;
+        // todo: use a better way to control the decoding loop.
+        self.decode_body()?;
+        Ok(())
+    }
+
+    /// Launch a worker thread that will read from the stream and send the data to the demuxer.
+    /// After calling this method, the decoder instance will be moved away from the main thread.
+    /// Instead, use the exchange to manipulate the decoder.
+    pub fn launch_worker_thread(mut self) -> JoinHandle<()> {
+        thread::spawn(move || {
+            self.run().unwrap();
+        })
     }
 }
