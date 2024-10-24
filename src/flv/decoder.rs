@@ -330,7 +330,7 @@ impl Decoder {
         const DEBUGGING: bool = true;
 
         loop {
-            if let Ok(received) = self.channel_receiver.try_recv() {
+            if let Ok(received) = self.channel_receiver.recv() {
                 if let PackedContent::ToDecoder(packed_content) = received {
                     match packed_content {
                         PackedContentToDecoder::PushData(mut data) => {
@@ -345,10 +345,16 @@ impl Decoder {
                         PackedContentToDecoder::CloseWorkerThread => {
                             break;
                         }
+                        PackedContentToDecoder::Now => {
+                            // this will literally do nothing.
+                            // just applied to remove potential blockage.
+                        }
                     }
                 }
             } else {
-                continue;
+                // todo: use a better way to replace recv().
+                println!("Channel closed.");
+                return Ok(());
             }
 
             if DEBUGGING {
@@ -358,11 +364,12 @@ impl Decoder {
                 dbg_cnt += 1;
             }
 
-            if self.data.is_empty() || (!self.decoding) {
-                continue;
+            'decoding: loop {
+                if self.data.is_empty() || (!self.decoding) {
+                    break 'decoding;
+                }
+                self.decode_body_once()?
             }
-
-            self.decode_body_once()?
         }
         Ok(())
     }
@@ -379,7 +386,6 @@ impl Decoder {
             self.previous_tag_size = tag.data_size + HEADER_SIZE;
 
             // dbg!(&tag);
-            // todo: send tag to demuxer.
             self.send_tag_to_demuxer(tag)?;
             Ok(())
         } else {

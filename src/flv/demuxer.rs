@@ -90,7 +90,7 @@ impl Demuxer {
             self.send_to_remuxer(pack)?;
         }
 
-        if let Some(audio) = self.cache_audio_tags.pop_front() {
+        while let Some(audio) = self.cache_audio_tags.pop_front() {
             let pack = Packed {
                 packed_routing: Destination::Remuxer,
                 packed_content: PackedContent::ToRemuxer(PackedContentToRemuxer::PushTag(audio)),
@@ -98,7 +98,7 @@ impl Demuxer {
             self.send_to_remuxer(pack)?;
         }
 
-        if let Some(video) = self.cache_video_tags.pop_front() {
+        while let Some(video) = self.cache_video_tags.pop_front() {
             let pack = Packed {
                 packed_routing: Destination::Remuxer,
                 packed_content: PackedContent::ToRemuxer(PackedContentToRemuxer::PushTag(video)),
@@ -106,7 +106,7 @@ impl Demuxer {
             self.send_to_remuxer(pack)?;
         }
 
-        if let Some(script) = self.cache_script_tags.pop_front() {
+        while let Some(script) = self.cache_script_tags.pop_front() {
             let pack = Packed {
                 packed_routing: Destination::Remuxer,
                 packed_content: PackedContent::ToRemuxer(PackedContentToRemuxer::PushTag(script)),
@@ -119,28 +119,37 @@ impl Demuxer {
 
     pub fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         loop {
-            match self.channel_receiver.recv()? {
-                PackedContent::ToDemuxer(content) => {
-                    match content {
-                        PackedContentToDemuxer::PushTag(tag) => {
-                            // todo: implement tag processing.
-                            self.process_incoming_tag(tag);
-                        }
-                        PackedContentToDemuxer::PushFlvHeader(flv_header) => {
-                            self.cache_flv_header = Some(flv_header);
-                        }
-                        PackedContentToDemuxer::StartDemuxing => {
-                            self.set_demuxing(true);
-                        }
-                        PackedContentToDemuxer::StopDemuxing => {
-                            self.set_demuxing(false);
-                        }
-                        PackedContentToDemuxer::CloseWorkerThread => {
-                            break;
+            if let Ok(received) = self.channel_receiver.recv() {
+                match received {
+                    PackedContent::ToDemuxer(content) => {
+                        match content {
+                            PackedContentToDemuxer::PushTag(tag) => {
+                                // todo: implement tag processing.
+                                self.process_incoming_tag(tag);
+                            }
+                            PackedContentToDemuxer::PushFlvHeader(flv_header) => {
+                                self.cache_flv_header = Some(flv_header);
+                            }
+                            PackedContentToDemuxer::StartDemuxing => {
+                                self.set_demuxing(true);
+                            }
+                            PackedContentToDemuxer::StopDemuxing => {
+                                self.set_demuxing(false);
+                            }
+                            PackedContentToDemuxer::CloseWorkerThread => {
+                                break;
+                            }
+                            PackedContentToDemuxer::Now => {
+                                // just to temporarily remove thread blockage.
+                            }
                         }
                     }
+                    _ => {}
                 }
-                _ => {}
+            } else {
+                // todo: use a better way instead of recv().
+                println!("Channel closed.");
+                return Ok(());
             }
 
             if !self.demuxing {
@@ -152,6 +161,8 @@ impl Demuxer {
         Ok(())
     }
 
+    /// Launch a worker thread, move the self into it.
+    /// Note that the data stream will not be sent unless the StartDemuxing command is sent.
     pub fn launch_worker_thread(mut self) -> JoinHandle<()> {
         std::thread::spawn(move || {
             self.run().unwrap();

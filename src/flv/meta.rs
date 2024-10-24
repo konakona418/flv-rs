@@ -1,4 +1,5 @@
-use crate::flv::script::ScriptTagBody;
+use std::collections::HashMap;
+use crate::flv::script::{ScriptData, ScriptTagBody};
 
 pub struct MetaData {
     pub audio_codec_id: f64,
@@ -57,12 +58,40 @@ impl MetaData {
 }
 
 pub struct RawMetaData {
-    pub data: ScriptTagBody
+    data: HashMap<String, ScriptData>
 }
 
 impl RawMetaData {
     pub fn new(data: ScriptTagBody) -> Self {
-        Self { data }
+        let map = data.value.properties.into_iter().map(|pair| (pair.name.data, pair.value)).collect();
+        Self { data: map }
+    }
+
+    #[inline]
+    pub fn try_get(&self, key: &str) -> Option<ScriptData> {
+        self.data.get(key).cloned()
+    }
+
+    pub fn try_get_string(&self, key: &str) -> Option<String> {
+        match self.try_get(key) {
+            Some(ScriptData::String(string)) => Some(string.data),
+            Some(ScriptData::LongString(string)) => Some(string.data),
+            _ => None,
+        }
+    }
+
+    pub fn try_get_number(&self, key: &str) -> Option<f64> {
+        match self.try_get(key) {
+            Some(ScriptData::Number(number)) => Some(number),
+            _ => None,
+        }
+    }
+
+    pub fn try_get_boolean(&self, key: &str) -> Option<bool> {
+        match self.try_get(key) {
+            Some(ScriptData::Boolean(boolean)) => Some(boolean == 1),
+            _ => None,
+        }
     }
 }
 

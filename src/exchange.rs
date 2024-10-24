@@ -119,7 +119,9 @@ pub enum PackedContentToDecoder {
 
     StartDecoding,
     StopDecoding,
-    CloseWorkerThread
+    CloseWorkerThread,
+
+    Now
 }
 
 pub enum PackedContentToDemuxer {
@@ -128,7 +130,9 @@ pub enum PackedContentToDemuxer {
 
     StartDemuxing,
     StopDemuxing,
-    CloseWorkerThread
+    CloseWorkerThread,
+
+    Now
 }
 
 pub enum PackedContentToRemuxer {
@@ -138,5 +142,7 @@ pub enum PackedContentToRemuxer {
 
     StartRemuxing,
     StopRemuxing,
-    CloseWorkerThread
+    CloseWorkerThread,
+
+    Now
 }
