@@ -1,4 +1,4 @@
-use crate::exchange::{Destination, ExchangeRegistrable, Packed, PackedContent, PackedContentToDemuxer, PackedRouting};
+use crate::exchange::{Destination, ExchangeRegistrable, Packed, PackedContent, PackedContentToDecoder, PackedContentToDemuxer};
 use crate::flv::header::{AudioTagHeader, EncryptionTagHeader, FilterParameters, FlvHeader, TagHeader, VideoTagHeader};
 use crate::flv::script::ScriptTagBody;
 use crate::flv::tag::{EncryptedTagBody, NormalTagBody, Tag, TagBody, TagType};
@@ -14,6 +14,7 @@ pub struct Decoder {
     channel_exchange: Option<mpsc::Sender<Packed>>,
     channel_receiver: mpsc::Receiver<PackedContent>,
     channel_sender: mpsc::Sender<PackedContent>,
+    decoding: bool,
 }
 
 impl ExchangeRegistrable for Decoder {
@@ -39,6 +40,7 @@ impl Decoder {
             channel_exchange: None,
             channel_receiver,
             channel_sender,
+            decoding: false,
         }
     }
 
@@ -319,13 +321,36 @@ impl Decoder {
         ))
     }
 
-    pub fn decode_body(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        const HEADER_SIZE: u32 = 11;
+    fn set_decoding(&mut self, flag: bool) {
+        self.decoding = flag;
+    }
 
+    pub fn decode_body(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut dbg_cnt = 0; // todo: this shall be removed.
-        const DEBUGGING: bool = false;
+        const DEBUGGING: bool = true;
 
         loop {
+            if let Ok(received) = self.channel_receiver.try_recv() {
+                if let PackedContent::ToDecoder(packed_content) = received {
+                    match packed_content {
+                        PackedContentToDecoder::PushData(mut data) => {
+                            self.data.append(&mut data)
+                        }
+                        PackedContentToDecoder::StartDecoding => {
+                            self.set_decoding(true);
+                        }
+                        PackedContentToDecoder::StopDecoding => {
+                            self.set_decoding(false);
+                        }
+                        PackedContentToDecoder::CloseWorkerThread => {
+                            break;
+                        }
+                    }
+                }
+            } else {
+                continue;
+            }
+
             if DEBUGGING {
                 if dbg_cnt > 100 {
                     break;
@@ -333,33 +358,40 @@ impl Decoder {
                 dbg_cnt += 1;
             }
 
-            let previous_tag_size = self.drain_u32();
-
-            if self.data.is_empty() {
-                break;
+            if self.data.is_empty() || (!self.decoding) {
+                continue;
             }
 
-            //dbg!(previous_tag_size);
-            if previous_tag_size == self.previous_tag_size {
-                let tag = self.decode_tag()?;
-                //dbg!(tag.data_size + HEADER_SIZE);
-                self.previous_tag_size = tag.data_size + HEADER_SIZE;
-
-                // dbg!(&tag);
-                // todo: send tag to demuxer.
-                self.send_tag_to_demuxer(tag)?;
-            } else {
-                return Err(
-                    Box::new(
-                        std::io::Error::new(
-                            std::io::ErrorKind::InvalidData, 
-                            format!("Tag size mismatch: expected {}, read {}.", previous_tag_size, self.previous_tag_size)
-                        )
-                    )
-                );
-            }
+            self.decode_body_once()?
         }
         Ok(())
+    }
+
+    pub fn decode_body_once(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        const HEADER_SIZE: u32 = 11;
+
+        let previous_tag_size = self.drain_u32();
+
+        //dbg!(previous_tag_size);
+        if previous_tag_size == self.previous_tag_size {
+            let tag = self.decode_tag()?;
+            //dbg!(tag.data_size + HEADER_SIZE);
+            self.previous_tag_size = tag.data_size + HEADER_SIZE;
+
+            // dbg!(&tag);
+            // todo: send tag to demuxer.
+            self.send_tag_to_demuxer(tag)?;
+            Ok(())
+        } else {
+            Err(
+                Box::new(
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("Tag size mismatch: expected {}, read {}.", previous_tag_size, self.previous_tag_size)
+                    )
+                )
+            )
+        }
     }
 
     fn send_to_demuxer(&mut self, pack: Packed) -> Result<(), Box<dyn std::error::Error>> {
@@ -375,7 +407,7 @@ impl Decoder {
 
     fn send_tag_to_demuxer(&mut self, tag: Tag) -> Result<(), Box<dyn std::error::Error>> {
         let pack: Packed = Packed {
-            packed_routing: PackedRouting::ToDemuxer,
+            packed_routing: Destination::Demuxer,
             packed_content: PackedContent::ToDemuxer(PackedContentToDemuxer::PushTag(tag)),
         };
         self.send_to_demuxer(pack)
@@ -383,7 +415,7 @@ impl Decoder {
 
     fn send_header_to_demuxer(&mut self, flv_header: FlvHeader) -> Result<(), Box<dyn std::error::Error>> {
         let pack: Packed = Packed {
-            packed_routing: PackedRouting::ToDemuxer,
+            packed_routing: Destination::Demuxer,
             packed_content: PackedContent::ToDemuxer(PackedContentToDemuxer::PushFlvHeader(flv_header)),
         };
         self.send_to_demuxer(pack)

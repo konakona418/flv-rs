@@ -23,7 +23,7 @@ pub fn parse_object(data: &mut Decoder) -> Result<ScriptData, Box<dyn std::error
     Ok(value)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScriptTagBody {
     pub name: ScriptDataString,
     pub value: ScriptDataEcmaArray,
@@ -37,7 +37,7 @@ impl ScriptTagBody {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ScriptData {
     Number(f64),
     Boolean(u8),
@@ -55,7 +55,7 @@ pub enum ScriptData {
     NotImplemented,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScriptDataObject {
     pub properties: Vec<ScriptDataObjectProp>,
 }
@@ -92,13 +92,13 @@ impl ScriptDataObject {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScriptDataObjectProp {
     pub name: ScriptDataString,
     pub value: ScriptData,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScriptDataString {
     pub length: u16,
     pub data: String,
@@ -129,7 +129,7 @@ impl ScriptDataString {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScriptDataLongString {
     pub length: u32,
     pub data: String,
@@ -157,7 +157,7 @@ impl ScriptDataLongString {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScriptDataEcmaArray {
     pub length: u32,
     pub properties: Vec<ScriptDataObjectProp>,
@@ -192,7 +192,7 @@ impl ScriptDataEcmaArray {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScriptStrictArray {
     pub length: u32,
     pub values: Vec<ScriptData>,
@@ -224,7 +224,7 @@ impl ScriptStrictArray {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScriptDataDate {
     pub date: f64,
     pub local_time_offset: i16,

@@ -2,6 +2,7 @@ mod flv;
 mod io;
 mod core;
 mod exchange;
+mod fmpeg;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
@@ -9,8 +10,9 @@ pub fn add(left: u64, right: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
+    use std::collections::{HashMap, VecDeque};
     use crate::flv::decoder::Decoder;
+    use crate::flv::tag::TagType;
     use super::*;
 
     #[test]
@@ -76,13 +78,32 @@ mod tests {
         assert_eq!(decoder.drain_u32(), 4294967295);
         assert_eq!(decoder.drain_u64(), 18446744073709551615u64);*/
 
+
+        /*
         let core = core::Core::new();
         let mut buf = std::fs::read("D:/test.flv").unwrap();
         let mut decoder = Decoder::new(VecDeque::from(buf));
         dbg!(decoder.decode_header().unwrap());
-        dbg!(decoder.decode_body().unwrap());
+        for _ in 0..100 {
+            dbg!(decoder.decode_body_once().unwrap());
+        } */
+
 
         // Note: by the way, till this commit, the decoder (especially the AAC part)
         // works quite well in single thread mode and in unit tests.
+
+        // the Hash and Eq impls for Destination are not tested.
+        let map: HashMap<exchange::Destination, String> = HashMap::from([
+            (exchange::Destination::Core, "core".to_string()),
+            (exchange::Destination::Decoder, "decoder".to_string()),
+            (exchange::Destination::Demuxer, "demuxer".to_string()),
+        ]);
+        assert_eq!(map.get(&exchange::Destination::Core).unwrap(), "core");
+        assert_eq!(map.get(&exchange::Destination::Decoder).unwrap(), "decoder");
+        assert_eq!(map.get(&exchange::Destination::Demuxer).unwrap(), "demuxer");
+
+        assert_eq!(TagType::Audio, TagType::Audio);
+        assert_eq!(TagType::Video, TagType::Video);
+        // now it's tested.
     }
 }

@@ -1,8 +1,8 @@
-use std::fmt::{Debug, Formatter};
 use crate::flv::header::{EncryptionTagHeader, FilterParameters, TagHeader};
-use crate::flv::script::{ScriptData, ScriptTagBody};
+use crate::flv::script::ScriptTagBody;
+use std::fmt::{Debug, Formatter};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tag {
     pub filter: bool,
     pub tag_type: TagType,
@@ -17,7 +17,7 @@ pub struct Tag {
     pub tag_body: TagBody,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TagType {
     Audio,
     Video,
@@ -25,12 +25,36 @@ pub enum TagType {
     Encryption,
 }
 
-#[derive(Debug)]
+impl PartialEq<Self> for TagType {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            TagType::Audio => match other {
+                TagType::Audio => true,
+                _ => false
+            },
+            TagType::Video => match other {
+                TagType::Video => true,
+                _ => false
+            },
+            TagType::Script => match other {
+                TagType::Script => true,
+                _ => false
+            },
+            TagType::Encryption => match other {
+                TagType::Encryption => true,
+                _ => false
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum TagBody {
     Normal(NormalTagBody),
     Encrypted(EncryptedTagBody),
 }
 
+#[derive(Clone)]
 pub enum NormalTagBody {
     Audio(Vec<u8>),
     Video(Vec<u8>),
@@ -53,6 +77,7 @@ impl Debug for NormalTagBody {
             }
             NormalTagBody::Script(data) => {
                 f.debug_struct("Script")
+                    .field("name", &data.name)
                     .field("data_size", &data.value.length)
                     .field("data", &data.value.properties)
                     .finish()
@@ -66,7 +91,7 @@ impl Debug for NormalTagBody {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum EncryptedTagBody {
     Audio(Vec<u8>),
     Video(Vec<u8>),

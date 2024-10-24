@@ -16,7 +16,7 @@ impl FlvHeader {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TagHeader {
     Audio(AudioTagHeader),
     Video(VideoTagHeader),
@@ -24,7 +24,7 @@ pub enum TagHeader {
     Placeholder,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AudioTagHeader {
     // UB4
     pub sound_format: u8,
@@ -62,7 +62,7 @@ impl AudioTagHeader {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VideoTagHeader {
     // UB4
     pub frame_type: u8,
@@ -100,7 +100,7 @@ impl VideoTagHeader {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EncryptionTagHeader {
     // todo: encryption
 }
@@ -111,18 +111,18 @@ impl EncryptionTagHeader {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FilterParameters {
     EncryptionFilter(EncryptionFilterParameters),
     SelectiveEncryptionFilter(SelectiveEncryptionFilterParameters),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EncryptionFilterParameters {
     // todo: encryption
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SelectiveEncryptionFilterParameters {
     // todo: selective encryption
 }

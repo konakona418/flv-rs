@@ -1,3 +1,5 @@
+use crate::flv::script::ScriptTagBody;
+
 pub struct MetaData {
     pub audio_codec_id: f64,
     pub audio_data_rate: f64,
@@ -51,6 +53,16 @@ impl MetaData {
             video_data_rate,
             width,
         }
+    }
+}
+
+pub struct RawMetaData {
+    pub data: ScriptTagBody
+}
+
+impl RawMetaData {
+    pub fn new(data: ScriptTagBody) -> Self {
+        Self { data }
     }
 }
 
