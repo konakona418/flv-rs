@@ -56,6 +56,7 @@ impl Remuxer {
     }
 
     fn send_mpeg4_header(&mut self) {
+        // todo: send mpeg4 header
     }
 
     fn remux(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -63,7 +64,7 @@ impl Remuxer {
             match tag.tag_type {
                 TagType::Audio => {
                     let parsed = Parser::parse_audio(&tag)?;
-
+                    // todo: fill this
                 }
                 TagType::Video => {}
                 TagType::Script => {}

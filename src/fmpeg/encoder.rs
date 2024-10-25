@@ -1,6 +1,6 @@
 use crate::fmpeg::remux_context::{AudioCodecType, RemuxContext, VideoCodecType, TIME_SCALE};
 use crate::fmpeg::mp4head;
-use crate::fmpeg::mp4head::{AudioMediaHandlerBox, FileTypeBox, FixedPoint32, HandlerType, MediaBox, MovieBox, MovieHeaderBox, SampleBoxTableBox, VideoMediaHandlerBox, XMediaHandlerBox};
+use crate::fmpeg::mp4head::{AudioMediaHandlerBox, FileTypeBox, FixedPoint32, HandlerType, ISerializable, MediaBox, MovieBox, MovieHeaderBox, SampleBoxTableBox, VideoMediaHandlerBox, XMediaHandlerBox};
 use crate::fmpeg::mp4head::aac_utils::AacAudioSpecConfLike;
 use crate::fmpeg::mp4head::avc1_utils::AvcCBoxLike::AvcCBoxLike;
 
@@ -108,7 +108,8 @@ impl Encoder {
                                 mp4head::Avc1DescriptionBoxBuilder::new()
                                     .set_width(ctx.width as u16)
                                     .set_height(ctx.height as u16)
-                                    .avcc_box(AvcCBoxLike(vec![0x01, 0x64, 0x00, 0x1e, 0xac, 0x2b, 0x40]))
+                                    .avcc_box(ctx.video_avcc_info.clone())
+                                    // todo: here is the place to add video configuration
                                     .build()
                             )
                         } else {
@@ -122,7 +123,7 @@ impl Encoder {
                                     mp4head::Mp4aDescriptionBoxBuilder::new()
                                         .sample_rate(ctx.audio_sample_rate as f32)
                                         .num_audio_channels(ctx.audio_channels as u16)
-                                        .spec_config(AacAudioSpecConfLike::VectorConfig(vec![0x00, 0x00, 0x00, 0x00]))
+                                        .spec_config(AacAudioSpecConfLike::VectorConfig(ctx.audio_aac_info.clone()))
                                         .build()
                                 )
                             }

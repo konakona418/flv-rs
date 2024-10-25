@@ -1,5 +1,6 @@
 use crate::flv::header::FlvHeader;
 use crate::flv::meta::RawMetaData;
+use crate::fmpeg::mp4head::avc1_utils::AvcCBoxLike;
 
 pub const TIME_SCALE: u32 = 1000;
 
@@ -16,19 +17,26 @@ pub struct RemuxContext {
     pub has_video: bool,
 
     pub audio_codec_id: u8,
+    pub audio_codec_type: AudioCodecType,
     pub audio_data_rate: u32,
+
+    // --- must be initialized using audio tag data ---
     pub audio_sample_rate: u32,
     pub audio_channels: u8,
+    pub audio_aac_info: Vec<u8>,
+    // ------------------------------------------------
 
     pub video_codec_id: u8,
+    pub video_codec_type: VideoCodecType,
+
+    // --- must be initialized using video tag data ---
     pub video_data_rate: u32,
+    pub video_avcc_info: AvcCBoxLike,
+    // ------------------------------------------------
 
     pub major_brand: String,
     pub minor_version: String,
     pub compatible_brands: Vec<String>,
-
-    pub video_codec_type: VideoCodecType,
-    pub audio_codec_type: AudioCodecType,
 
     header_sent: bool,
     flv_header_configured: bool,
@@ -42,10 +50,29 @@ pub enum VideoCodecType {
     None
 }
 
+impl From<u8> for VideoCodecType {
+    fn from(value: u8) -> Self {
+        match value {
+            7 => VideoCodecType::Avc1,
+            _ => VideoCodecType::None
+        }
+    }
+}
+
 pub enum AudioCodecType {
     Aac,
     Mp3,
     None,
+}
+
+impl From<u8> for AudioCodecType {
+    fn from(value: u8) -> Self {
+        match value {
+            10 => AudioCodecType::Aac,
+            2 => AudioCodecType::Mp3,
+            _ => AudioCodecType::None
+        }
+    }
 }
 
 impl RemuxContext {
@@ -65,9 +92,11 @@ impl RemuxContext {
             audio_data_rate: 0,
             audio_sample_rate: 0,
             audio_channels: 0,
+            audio_aac_info: vec![],
 
             video_codec_id: 0,
             video_data_rate: 0,
+            video_avcc_info: AvcCBoxLike::AvcCBoxLike(vec![]),
 
             major_brand: String::from("isom"),
             minor_version: String::from("512"),
@@ -110,6 +139,7 @@ impl RemuxContext {
 
         if let Some(audio_codec_id) = metadata.try_get_number("audiocodecid") {
             self.audio_codec_id = audio_codec_id as u8;
+            self.audio_codec_type = AudioCodecType::from(self.audio_codec_id);
         }
 
         if let Some(audio_data_rate) = metadata.try_get_number("audiodatarate") {
@@ -118,6 +148,7 @@ impl RemuxContext {
 
         if let Some(video_codec_id) = metadata.try_get_number("videocodecid") {
             self.video_codec_id = video_codec_id as u8;
+            self.video_codec_type = VideoCodecType::from(self.video_codec_id);
         }
 
         if let Some(video_data_rate) = metadata.try_get_number("videodatarate") {

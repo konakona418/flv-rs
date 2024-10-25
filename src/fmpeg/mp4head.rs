@@ -2317,7 +2317,7 @@ impl Mp3DescriptionBoxBuilder {
 pub mod avc1_utils {
     use crate::fmpeg::mp4head::ISerializable;
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub enum AvcCBoxLike {
         AvcCBoxLike(Vec<u8>)
     }

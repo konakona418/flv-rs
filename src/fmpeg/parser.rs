@@ -233,4 +233,6 @@ impl Parser {
     fn parse_aac_raw(body: &VecDeque<u8>) -> Result<AudioParseResult, Box<dyn std::error::Error>> {
         Ok(AudioParseResult::AacRaw(body.clone()))
     }
+
+    // todo: implement video parsing.
 }
