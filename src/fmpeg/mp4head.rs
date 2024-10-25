@@ -1436,7 +1436,7 @@ impl ISerializable for SubSampleDescriptionTableBox {
 }
 
 pub mod aac_utils {
-    use crate::fmpeg::mp4::ISerializable;
+    use crate::fmpeg::mp4head::ISerializable;
     use crate::io;
     use crate::io::bit::UIntParserEndian;
 
@@ -2016,7 +2016,7 @@ impl ISerializable for Mp3DescriptionBox {
 }
 
 pub mod avc1_utils {
-    use crate::fmpeg::mp4::ISerializable;
+    use crate::fmpeg::mp4head::ISerializable;
 
     pub enum AvcCBoxLike {
         AvcCBoxLike(Vec<u8>)
@@ -2149,6 +2149,12 @@ impl Avc1DescriptionBoxBuilder {
 
 pub struct TimeToSampleBox;
 
+impl TimeToSampleBox {
+    pub fn new(sample_count: u32) -> Self {
+        Self {}
+    }
+}
+
 impl ISerializable for TimeToSampleBox {
     #[inline]
     fn serialize(&mut self) -> Vec<u8> {
@@ -2168,6 +2174,12 @@ impl ISerializable for TimeToSampleBox {
 
 pub struct SampleToChunkBox;
 
+impl SampleToChunkBox {
+    pub fn new(sample_count: u32) -> Self {
+        Self {}
+    }
+}
+
 impl ISerializable for SampleToChunkBox {
     #[inline]
     fn serialize(&mut self) -> Vec<u8> {
@@ -2186,6 +2198,12 @@ impl ISerializable for SampleToChunkBox {
 }
 
 pub struct SampleSizeBox;
+
+impl SampleSizeBox {
+    pub fn new(sample_size: u32) -> Self {
+        Self {}
+    }
+}
 
 impl ISerializable for SampleSizeBox {
     #[inline]
@@ -2207,6 +2225,12 @@ impl ISerializable for SampleSizeBox {
 
 pub struct ChunkOffsetBox;
 
+impl ChunkOffsetBox {
+    pub fn new(chunk_offset: u32) -> Self {
+        Self {}
+    }
+}
+
 impl ISerializable for ChunkOffsetBox {
     #[inline]
     fn serialize(&mut self) -> Vec<u8> {
@@ -2223,3 +2247,5 @@ impl ISerializable for ChunkOffsetBox {
         16
     }
 }
+
+// above are the implementation of file head.

@@ -42,23 +42,23 @@ impl BitIO {
     }
 }
 
-pub enum U16ParserEndian {
+pub enum UIntParserEndian {
     LittleEndian,
     BigEndian
 }
 pub struct U16BitIO {
-    data: [u8; 2],
-    endian: U16ParserEndian
+    pub(crate) data: [u8; 2],
+    endian: UIntParserEndian
 }
 
 impl U16BitIO {
     #[inline]
-    pub fn new(data: u16, endian: U16ParserEndian) -> U16BitIO {
+    pub fn new(data: u16, endian: UIntParserEndian) -> U16BitIO {
         let data = match endian {
-            U16ParserEndian::LittleEndian => {
+            UIntParserEndian::LittleEndian => {
                 data.to_le_bytes()
             }
-            U16ParserEndian::BigEndian => {
+            UIntParserEndian::BigEndian => {
                 data.to_be_bytes()
             }
         };
@@ -112,17 +112,17 @@ impl U16BitIO {
 
 pub struct U32BitIO {
     data: [u8; 4],
-    endian: U16ParserEndian
+    endian: UIntParserEndian
 }
 
 impl U32BitIO {
     #[inline]
-    pub fn new(data: u32, endian: U16ParserEndian) -> U32BitIO {
+    pub fn new(data: u32, endian: UIntParserEndian) -> U32BitIO {
         let data = match endian {
-            U16ParserEndian::LittleEndian => {
+            UIntParserEndian::LittleEndian => {
                 data.to_le_bytes()
             }
-            U16ParserEndian::BigEndian => {
+            UIntParserEndian::BigEndian => {
                 data.to_be_bytes()
             }
         };

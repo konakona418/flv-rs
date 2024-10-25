@@ -13,7 +13,7 @@ mod tests {
     use std::collections::{HashMap, VecDeque};
     use crate::flv::decoder::Decoder;
     use crate::flv::tag::TagType;
-    use crate::io::bit::U16ParserEndian;
+    use crate::io::bit::UIntParserEndian;
     use super::*;
 
     #[test]
@@ -108,7 +108,7 @@ mod tests {
         assert_eq!(TagType::Video, TagType::Video);
         // now it's tested.
 
-        let mut u16io = io::bit::U16BitIO::new(0x1234, U16ParserEndian::BigEndian);
+        let mut u16io = io::bit::U16BitIO::new(0x1234, UIntParserEndian::BigEndian);
         assert_eq!(u16io.read_at(0), false);
         assert_eq!(u16io.read_at(3), true);
         assert_eq!(u16io.read_at(7), false);
@@ -131,7 +131,7 @@ mod tests {
         u16io.write_range(10, 15, 0b101010);
         assert_eq!(u16io.read_range(10, 15), 0b101010);
 
-        let mut u16io = io::bit::U16BitIO::new(0b1111000000000000, U16ParserEndian::BigEndian);
+        let mut u16io = io::bit::U16BitIO::new(0b1111000000000000, UIntParserEndian::BigEndian);
         u16io.write_range(0, 4, 0b11011);
         dbg!(u16io.read_range(0, 3));
         dbg!(u16io.read_range(4, 7));
