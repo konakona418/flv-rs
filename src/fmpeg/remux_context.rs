@@ -1,7 +1,7 @@
 use crate::flv::header::FlvHeader;
 use crate::flv::meta::RawMetaData;
 
-const TIME_SCALE: u32 = 1000;
+pub const TIME_SCALE: u32 = 1000;
 
 pub struct RemuxContext {
     pub fps: f64,
@@ -17,6 +17,8 @@ pub struct RemuxContext {
 
     pub audio_codec_id: u8,
     pub audio_data_rate: u32,
+    pub audio_sample_rate: u32,
+    pub audio_channels: u8,
 
     pub video_codec_id: u8,
     pub video_data_rate: u32,
@@ -24,6 +26,26 @@ pub struct RemuxContext {
     pub major_brand: String,
     pub minor_version: String,
     pub compatible_brands: Vec<String>,
+
+    pub video_codec_type: VideoCodecType,
+    pub audio_codec_type: AudioCodecType,
+
+    header_sent: bool,
+    flv_header_configured: bool,
+    metadata_configured: bool,
+    video_metadata_configured: bool,
+    audio_metadata_configured: bool,
+}
+
+pub enum VideoCodecType {
+    Avc1,
+    None
+}
+
+pub enum AudioCodecType {
+    Aac,
+    Mp3,
+    None,
 }
 
 impl RemuxContext {
@@ -41,6 +63,8 @@ impl RemuxContext {
 
             audio_codec_id: 0,
             audio_data_rate: 0,
+            audio_sample_rate: 0,
+            audio_channels: 0,
 
             video_codec_id: 0,
             video_data_rate: 0,
@@ -48,12 +72,22 @@ impl RemuxContext {
             major_brand: String::from("isom"),
             minor_version: String::from("512"),
             compatible_brands: vec![String::from("isom"), String::from("iso2"), String::from("avc1"), String::from("mp41")],
+
+            video_codec_type: VideoCodecType::None,
+            audio_codec_type: AudioCodecType::None,
+
+            header_sent: false,
+            flv_header_configured: false,
+            metadata_configured: false,
+            video_metadata_configured: false,
+            audio_metadata_configured: false,
         }
     }
 
     pub fn parse_flv_header(&mut self, header: &FlvHeader) {
         self.has_audio = header.type_flags_audio;
         self.has_video = header.type_flags_video;
+        self.flv_header_configured = true;
     }
 
     pub fn parse_metadata(&mut self, metadata: &RawMetaData) {
@@ -104,5 +138,37 @@ impl RemuxContext {
             self.compatible_brands.push(String::from_iter(compatible_brands.drain(0..4)));
             self.compatible_brands.push(String::from_iter(compatible_brands.drain(0..4)));
         }
+
+        self.metadata_configured = true;
+    }
+
+    pub fn configure_video_metadata(&mut self) {
+        self.video_metadata_configured = true;
+         todo!()
+    }
+
+    pub fn configure_audio_metadata(&mut self) {
+        self.audio_metadata_configured = true;
+        todo!()
+    }
+
+    pub fn is_configured(&self) -> bool {
+        self.flv_header_configured && self.metadata_configured && self.video_metadata_configured && self.audio_metadata_configured
+    }
+
+    /// for testing only!!
+    pub fn _set_configured(&mut self, flag: bool) {
+        self.metadata_configured = flag;
+        self.flv_header_configured = flag;
+        self.video_metadata_configured = flag;
+        self.audio_metadata_configured = flag;
+    }
+
+    pub fn header_sent(&self) -> bool {
+        self.header_sent
+    }
+
+    pub fn set_header_sent(&mut self, flag: bool) {
+        self.header_sent = flag;
     }
 }

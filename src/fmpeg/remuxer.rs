@@ -1,10 +1,11 @@
 use crate::exchange::{ExchangeRegistrable, Packed, PackedContent, PackedContentToRemuxer};
 use crate::flv::meta::RawMetaData;
-use crate::flv::tag::Tag;
+use crate::flv::tag::{Tag, TagType};
 use std::collections::VecDeque;
 use std::sync::mpsc;
 use std::thread::JoinHandle;
 use crate::flv::header::FlvHeader;
+use crate::fmpeg::parser::Parser;
 use crate::fmpeg::remux_context::RemuxContext;
 
 pub struct Remuxer {
@@ -54,9 +55,20 @@ impl Remuxer {
         self.remuxing = flag;
     }
 
-    pub fn remux(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn send_mpeg4_header(&mut self) {
+    }
+
+    fn remux(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         while let Some(tag) = self.tags.pop_front() {
-            // todo: remux
+            match tag.tag_type {
+                TagType::Audio => {
+                    let parsed = Parser::parse_audio(&tag)?;
+
+                }
+                TagType::Video => {}
+                TagType::Script => {}
+                TagType::Encryption => {}
+            }
         }
 
         Ok(())
@@ -99,7 +111,15 @@ impl Remuxer {
                 continue;
             }
 
-            self.remux()?;
+            if self.ctx.is_configured() {
+                if self.ctx.header_sent() {
+                    self.remux()?;
+                } else {
+                    self.send_mpeg4_header();
+                }
+            } else {
+                println!("Not configured yet.");
+            }
         }
         Ok(())
     }

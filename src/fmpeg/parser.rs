@@ -9,6 +9,11 @@ pub enum AudioParseResult {
     Mp3(Mp3ParseResult)
 }
 
+pub enum AudioConfigurationLike {
+    Mp3(Mp3ParseResult),
+    Aac(AacSequenceHeader),
+}
+
 pub enum Mp3Version {
     Mp25,
     Mp20,
@@ -72,6 +77,7 @@ pub struct Mp3ParseResult {
     pub sample_rate: u32,
     pub bitrate: u32,
     pub channel: Channel,
+    pub channel_extended: u8,
 }
 
 pub const AUDIO_SAMPLE_RATE_TABLE_M10: [u32; 4] = [44100, 48000, 32000, 0];
@@ -140,8 +146,8 @@ impl Parser {
             return Err("MP3 sync word mismatch!".into());
         }
 
-        let version = Mp3Version::from(u16io.read_range(12, 13));
-        let layer = Mp3Layer::from(u16io.read_range(14, 15));
+        let version = Mp3Version::from(u16io.read_range(12, 13) as u8);
+        let layer = Mp3Layer::from(u16io.read_range(14, 15) as u8);
         let protection_bit = u16io.read_at(16);
 
         let mut u16io = io::bit::U16BitIO::new(
@@ -174,13 +180,21 @@ impl Parser {
         };
         // todo: is this okay?
 
-        let channel = Channel::from(channel_mode);
+        let channel = Channel::from(channel_mode as u8);
+        let channel_extended: u8;
+        if let Channel::JointStereo = channel {
+            channel_extended = u16io.read_range(10, 11) as u8;
+        } else {
+            channel_extended = 0;
+        }
+
         Ok(AudioParseResult::Mp3(Mp3ParseResult {
             version,
             layer,
             sample_rate,
             bitrate,
-            channel
+            channel,
+            channel_extended,
         }))
     }
 

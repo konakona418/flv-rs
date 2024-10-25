@@ -1,3 +1,5 @@
+use crate::fmpeg::mp4head::avc1_utils::AvcCBoxLike::AvcCBoxLike;
+
 pub struct Utils;
 impl Utils {
     #[inline]
@@ -19,6 +21,7 @@ impl Utils {
     }
 }
 
+#[derive(Debug)]
 pub struct U24 {
     pub value: u32,
 }
@@ -62,6 +65,7 @@ impl ISerializable for U24 {
     }
 }
 
+#[derive(Debug)]
 pub struct FixedPoint16 {
     pub integer: u8,
     pub fraction: u8,
@@ -74,13 +78,22 @@ impl FixedPoint16 {
     }
 
     #[inline]
+    fn to_float(&self) -> f32 {
+        self.integer as f32 + self.fraction as f32 / 256.0
+    }
+}
+
+impl From<f32> for FixedPoint16 {
+    #[inline]
     fn from(float: f32) -> FixedPoint16 {
         Self::new(float.trunc() as u8, ((float - float.trunc()) * 256.0) as u8)
     }
+}
 
+impl From<f64> for FixedPoint16 {
     #[inline]
-    fn to_float(&self) -> f32 {
-        self.integer as f32 + self.fraction as f32 / 256.0
+    fn from(float: f64) -> FixedPoint16 {
+        Self::new(float.trunc() as u8, ((float - float.trunc()) * 256.0) as u8)
     }
 }
 
@@ -107,6 +120,7 @@ impl ISerializable for FixedPoint16 {
     }
 }
 
+#[derive(Debug)]
 pub struct FixedPoint32 {
     pub integer: u16,
     pub fraction: u16,
@@ -119,14 +133,23 @@ impl FixedPoint32 {
     }
 
     #[inline]
-    fn from(float: f32) -> FixedPoint32 {
-        Self::new(float.trunc() as u16, ((float - float.trunc()) * 65536.0) as u16)
-    }
-
-    #[inline]
     fn to_float(&self) -> f32 {
         self.integer as f32 + self.fraction as f32 / 65536.0
    }
+}
+
+impl From<f32> for FixedPoint32 {
+    #[inline]
+    fn from(float: f32) -> FixedPoint32 {
+        Self::new(float.trunc() as u16, ((float - float.trunc()) * 65536.0) as u16)
+    }
+}
+
+impl From<f64> for FixedPoint32 {
+    #[inline]
+    fn from(float: f64) -> FixedPoint32 {
+        Self::new(float.trunc() as u16, ((float - float.trunc()) * 65536.0) as u16)
+    }
 }
 
 impl Default for FixedPoint32 {
@@ -169,6 +192,7 @@ pub trait ISerializable {
     fn size(&self) -> u32;
 }
 
+#[derive(Debug)]
 pub struct FileTypeBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -228,25 +252,29 @@ impl FileTypeBoxBuilder {
     }
 
     #[inline]
-    pub fn major_brand(mut self, major_brand: &String) {
-        self.major_brand = Utils::slice_to_char_array(major_brand)
+    pub fn major_brand(mut self, major_brand: &String) -> Self {
+        self.major_brand = Utils::slice_to_char_array(major_brand);
+        self
     }
 
     #[inline]
-    pub fn minor_version(mut self, minor_version: u32) {
+    pub fn minor_version(mut self, minor_version: u32) -> Self {
         self.minor_version = minor_version;
+        self
     }
 
     #[inline]
-    pub fn compatible_brand(mut self, compatible_brand: &String) {
+    pub fn compatible_brand(mut self, compatible_brand: &String) -> Self {
         self.compatible_brands.push(Utils::slice_to_char_array(compatible_brand));
+        self
     }
 
     #[inline]
-    pub fn compatible_brands(mut self, compatible_brands: Vec<&String>) {
+    pub fn compatible_brands(mut self, compatible_brands: Vec<String>) -> Self {
         for brand in compatible_brands {
-            self.compatible_brands.push(Utils::slice_to_char_array(brand));
+            self.compatible_brands.push(Utils::slice_to_char_array(&*brand));
         }
+        self
     }
 
     pub fn build(self) -> FileTypeBox {
@@ -264,6 +292,75 @@ impl FileTypeBoxBuilder {
     }
 }
 
+#[derive(Debug)]
+pub struct MovieBox {
+    pub size: u32,
+    pub box_type: [char; 4],
+
+    pub movie_header: MovieHeaderBox,
+    pub tracks: Vec<TrackBox>,
+}
+
+pub struct MovieBoxBuilder {
+    pub movie_header_box: Option<MovieHeaderBox>,
+    pub tracks: Vec<TrackBox>,
+}
+
+impl ISerializable for MovieBox {
+    #[inline]
+    fn serialize(&mut self) -> Vec<u8> {
+        self.size = self.size();
+
+        let mut result = vec![];
+        result.extend_from_slice(&self.size.to_be_bytes());
+        result.extend_from_slice(&self.box_type.map(|c| c as u8));
+        result.append(&mut self.movie_header.serialize());
+        for track in &mut self.tracks {
+            result.append(&mut track.serialize());
+        }
+        assert_eq!(result.len(), self.size() as usize);
+        result
+    }
+
+    #[inline]
+    fn size(&self) -> u32 {
+        8 + self.movie_header.size() + self.tracks.iter().map(|track| track.size()).sum::<u32>()
+    }
+}
+
+impl MovieBoxBuilder {
+    pub fn new() -> Self {
+        Self {
+            movie_header_box: None,
+            tracks: vec![],
+        }
+    }
+
+    pub fn movie_header_box(mut self, movie_header_box: MovieHeaderBox) -> Self {
+        self.movie_header_box = Some(movie_header_box);
+        self
+    }
+
+    pub fn track(mut self, track: TrackBox) -> Self {
+        self.tracks.push(track);
+        self
+    }
+
+    pub fn build(self) -> MovieBox {
+        let mut box_instance = MovieBox {
+            size: 0,
+            box_type: ['m', 'o', 'o', 'v'],
+            movie_header: self.movie_header_box.unwrap(),
+            tracks: self.tracks,
+        };
+        box_instance.size = box_instance.size();
+        assert_ne!(box_instance.size, 0);
+        // should not have zero size!
+        box_instance
+    }
+}
+
+#[derive(Debug)]
 pub enum MovieHeaderBox {
     V0(MovieHeaderBoxV0),
     V1(MovieHeaderBoxV1),
@@ -287,6 +384,7 @@ impl ISerializable for MovieHeaderBox {
     }
 }
 
+#[derive(Debug)]
 pub struct MovieHeaderBoxV0 {
     pub size: u32,
     pub box_type: [char; 4],
@@ -477,6 +575,7 @@ impl MovieHeaderBoxV0Builder {
     }
 }
 
+#[derive(Debug)]
 pub struct MovieHeaderBoxV1 {
     pub size: u32,
     pub box_type: [char; 4],
@@ -645,12 +744,34 @@ impl MovieHeaderBoxV1Builder {
     }
 }
 
+#[derive(Debug)]
 pub struct TrackBox {
     pub size: u32,
     pub box_type: [char; 4],
 
     pub track_header_box: TrackHeaderBox,
     pub media_box: MediaBox,
+}
+
+impl ISerializable for TrackBox {
+    #[inline]
+    fn serialize(&mut self) -> Vec<u8> {
+        self.size = self.size();
+
+        let mut result = vec![];
+        result.extend_from_slice(&self.size.to_be_bytes());
+        result.extend_from_slice(&self.box_type.map(|c| c as u8));
+
+        result.extend_from_slice(&self.track_header_box.serialize());
+        result.extend_from_slice(&self.media_box.serialize());
+
+        assert_eq!(result.len(), self.size() as usize);
+        result
+    }
+
+    fn size(&self) -> u32 {
+        8 + self.track_header_box.size() + self.media_box.size()
+    }
 }
 
 impl TrackBox {
@@ -664,6 +785,7 @@ impl TrackBox {
     }
 }
 
+#[derive(Debug)]
 pub enum TrackHeaderBox {
     V0(TrackHeaderBoxV0),
     V1(TrackHeaderBoxV1),
@@ -686,6 +808,7 @@ impl ISerializable for TrackHeaderBox {
     }
 }
 
+#[derive(Debug)]
 pub struct TrackHeaderBoxV0 {
     pub size: u32,
     pub box_type: [char; 4],
@@ -841,6 +964,7 @@ impl TrackHeaderBoxV0Builder {
     }
 }
 
+#[derive(Debug)]
 pub struct TrackHeaderBoxV1 {
     pub size: u32,
     pub box_type: [char; 4],
@@ -927,22 +1051,23 @@ impl ISerializable for TrackHeaderBoxV1 {
     }
 }
 
+#[derive(Debug)]
 pub struct MediaBox {
     pub size: u32,
     pub box_type: [char; 4],
 
     pub media_header: MediaHeaderBoxV0,
-    pub xmedia_handler_box: XMediaHandlerBox,
+    pub media_handler_box: HandlerBox,
     pub media_info_box: MediaInfoBox
 }
 
 impl MediaBox {
-    pub fn new(media_header: MediaHeaderBoxV0, xmedia_handler_box: XMediaHandlerBox, media_info_box: MediaInfoBox) -> Self {
+    pub fn new(media_header: MediaHeaderBoxV0, media_handler_box: HandlerBox, media_info_box: MediaInfoBox) -> Self {
         Self {
             size: 0,
             box_type: ['m', 'd', 'i', 'a'],
             media_header,
-            xmedia_handler_box,
+            media_handler_box,
             media_info_box
         }
     }
@@ -957,7 +1082,7 @@ impl ISerializable for MediaBox {
         result.extend_from_slice(&self.size.to_be_bytes());
         result.extend_from_slice(&self.box_type.map(|c| c as u8));
         result.extend_from_slice(&self.media_header.serialize());
-        result.extend_from_slice(&self.xmedia_handler_box.serialize());
+        result.extend_from_slice(&self.media_handler_box.serialize());
         result.extend_from_slice(&self.media_info_box.serialize());
         assert_eq!(result.len(), self.size() as usize);
         result
@@ -965,10 +1090,11 @@ impl ISerializable for MediaBox {
 
     #[inline]
     fn size(&self) -> u32 {
-        8 + self.media_header.size() + self.xmedia_handler_box.size() + self.media_info_box.size()
+        8 + self.media_header.size() + self.media_handler_box.size() + self.media_info_box.size()
     }
 }
 
+#[derive(Debug)]
 pub struct MediaHeaderBoxV0 {
     pub size: u32,
     pub box_type: [char; 4],
@@ -988,7 +1114,7 @@ impl MediaHeaderBoxV0 {
     pub fn new(creation_time: u32, modification_time: u32, timescale: u32, duration: u32, language: u16, quality: u16) -> Self {
         Self {
             size: 0,
-            box_type: ['m', 'h', 'd', 'r'],
+            box_type: ['m', 'd', 'h', 'd'],
             version: 0,
             flags: U24::from(0),
 
@@ -1092,6 +1218,7 @@ impl MediaHeaderBoxV0Builder {
     }
 }
 
+#[derive(Debug)]
 pub struct HandlerBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -1144,24 +1271,26 @@ impl ISerializable for HandlerBox {
     }
 }
 
+#[derive(Clone)]
 pub enum HandlerType {
     Video,
     Audio,
 }
 
 impl HandlerType {
-    pub fn into(self) -> Vec<u8> {
+    pub fn into(self) -> HandlerBox {
         match self {
             HandlerType::Video => {
-                HandlerBox::new(['v', 'i', 'd', 'e'], "VideoHandler\x00".to_string()).serialize()
+                HandlerBox::new(['v', 'i', 'd', 'e'], "VideoHandler\x00".to_string())
             }
             HandlerType::Audio => {
-                HandlerBox::new(['s', 'o', 'u', 'n'], "SoundHandler\x00".to_string()).serialize()
+                HandlerBox::new(['s', 'o', 'u', 'n'], "SoundHandler\x00".to_string())
             }
         }
     }
 }
 
+#[derive(Debug)]
 pub struct MediaInfoBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -1205,6 +1334,7 @@ impl ISerializable for MediaInfoBox {
     }
 }
 
+#[derive(Debug)]
 pub enum XMediaHandlerBox {
     Video(VideoMediaHandlerBox),
     Audio(AudioMediaHandlerBox),
@@ -1227,6 +1357,7 @@ impl ISerializable for XMediaHandlerBox {
     }
 }
 
+#[derive(Debug)]
 pub struct VideoMediaHandlerBox;
 
 impl VideoMediaHandlerBox {
@@ -1253,7 +1384,14 @@ impl ISerializable for VideoMediaHandlerBox {
     }
 }
 
+#[derive(Debug)]
 pub struct AudioMediaHandlerBox;
+
+impl AudioMediaHandlerBox {
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 impl ISerializable for AudioMediaHandlerBox {
     #[inline]
@@ -1272,13 +1410,29 @@ impl ISerializable for AudioMediaHandlerBox {
     }
  }
 
+#[derive(Debug)]
 pub struct DataInformationBox;
-impl ISerializable for DataInformationBox {
+
+pub struct DataReferenceBox;
+
+impl DataInformationBox {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl DataReferenceBox {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl ISerializable for DataReferenceBox {
     #[inline]
     fn serialize(&mut self) -> Vec<u8> {
         let data: [u8; 28] = [
             0x00, 0x00, 0x00, 0x1C, // size = 28
-            0x64, 0x72, 0x65, 0x66, // "dinf"
+            0x64, 0x72, 0x65, 0x66, // "dref"
             0x00, 0x00, 0x00, 0x00, // version = 0, flags = 0
             0x00, 0x00, 0x00, 0x01, // entry count = 1
             0x00, 0x00, 0x00, 0x0C, // box size = 12
@@ -1293,6 +1447,27 @@ impl ISerializable for DataInformationBox {
     }
 }
 
+impl ISerializable for DataInformationBox {
+    #[inline]
+    fn serialize(&mut self) -> Vec<u8> {
+        let head = [
+            0x00, 0x00, 0x00, 0x24, // size = 36
+            0x64, 0x69, 0x6E, 0x66, // "dinf"
+        ];
+        let dref = DataReferenceBox::new().serialize();
+        let mut result = vec![];
+        result.extend_from_slice(&head);
+        result.extend_from_slice(&dref);
+        assert_eq!(result.len(), 36);
+        result
+    }
+
+    fn size(&self) -> u32 {
+        36
+    }
+}
+
+#[derive(Debug)]
 pub struct SampleBoxTableBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -1332,6 +1507,21 @@ impl ISerializable for SampleBoxTableBox {
     }
 }
 
+impl SampleBoxTableBox {
+    pub fn new(sample_description_table_box: SampleDescriptionTableBox) -> SampleBoxTableBox {
+        Self {
+            size: 0,
+            box_type: ['s', 't', 'b', 'l'],
+            sample_description_table_box,
+            time_to_sample_box: TimeToSampleBox::new(),
+            sample_to_chunk_box: SampleToChunkBox::new(),
+            sample_size_box: SampleSizeBox::new(),
+            chunk_offset_box: ChunkOffsetBox::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct SampleDescriptionTableBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -1410,6 +1600,7 @@ impl SampleDescriptionTableBoxBuilder {
     }
 }
 
+#[derive(Debug)]
 pub enum SubSampleDescriptionTableBox {
     Mp4a(Mp4aDescriptionBox),
     Mp3(Mp3DescriptionBox),
@@ -1440,6 +1631,7 @@ pub mod aac_utils {
     use crate::io;
     use crate::io::bit::UIntParserEndian;
 
+    #[derive(Debug)]
     pub enum AacObjectType {
         Null,
         AacMain,
@@ -1498,6 +1690,7 @@ pub mod aac_utils {
         }
     }
 
+    #[derive(Debug)]
     pub enum SamplingFreqIndex {
         Freq96000,
         Freq88200,
@@ -1559,6 +1752,7 @@ pub mod aac_utils {
         }
     }
 
+    #[derive(Debug)]
     pub enum ChannelConfig {
         AacExtension,
         Mono,
@@ -1605,6 +1799,7 @@ pub mod aac_utils {
         }
     }
 
+    #[derive(Debug)]
     pub enum FrameLengthFlag {
         Sample1024_0,
         Sample960_1,
@@ -1630,6 +1825,7 @@ pub mod aac_utils {
         }
     }
 
+    #[derive(Debug)]
     pub enum CoreCoderDependentFlag {
         No,
         Yes,
@@ -1655,6 +1851,7 @@ pub mod aac_utils {
         }
     }
 
+    #[derive(Debug)]
     pub enum ExtensionFlag {
         No,
         Yes,
@@ -1683,9 +1880,10 @@ pub mod aac_utils {
     pub const GA_SPEC_CONF: [u8; 3] = [0x06, 0x01, 0x02];
     // see also ISO/IEC 14496-3:2009
 
+    #[derive(Debug)]
     pub enum AacAudioSpecConfLike {
         AacAudioSpecificConfig(AacAudioSpecificConfigBox),
-        AacAudioSpecificConfigLike(Vec<u8>),
+        VectorConfig(Vec<u8>),
     }
 
     impl ISerializable for AacAudioSpecConfLike {
@@ -1693,7 +1891,7 @@ pub mod aac_utils {
         fn serialize(&mut self) -> Vec<u8> {
             match self {
                 AacAudioSpecConfLike::AacAudioSpecificConfig(box_) => box_.serialize(),
-                AacAudioSpecConfLike::AacAudioSpecificConfigLike(data) => data.clone(),
+                AacAudioSpecConfLike::VectorConfig(data) => data.clone(),
             }
         }
 
@@ -1701,11 +1899,12 @@ pub mod aac_utils {
         fn size(&self) -> u32 {
             match self {
                 AacAudioSpecConfLike::AacAudioSpecificConfig(box_) => box_.size(),
-                AacAudioSpecConfLike::AacAudioSpecificConfigLike(data) => data.len() as u32,
+                AacAudioSpecConfLike::VectorConfig(data) => data.len() as u32,
             }
         }
     }
 
+    #[derive(Debug)]
     pub struct AacAudioSpecificConfigBox {
         pub aac_object_type: AacObjectType,
         pub sampling_freq_index: SamplingFreqIndex,
@@ -1713,6 +1912,19 @@ pub mod aac_utils {
         pub frame_length_flag: FrameLengthFlag,
         pub core_coder_dependent_flag: CoreCoderDependentFlag,
         pub extension_flag: ExtensionFlag,
+    }
+
+    impl Default for AacAudioSpecificConfigBox {
+        fn default() -> Self {
+            AacAudioSpecificConfigBox {
+                aac_object_type: AacObjectType::AacMain,
+                sampling_freq_index: SamplingFreqIndex::Freq48000,
+                channel_config: ChannelConfig::Stereo,
+                frame_length_flag: FrameLengthFlag::Sample960_1,
+                core_coder_dependent_flag: CoreCoderDependentFlag::No,
+                extension_flag: ExtensionFlag::No,
+           }
+        }
     }
 
     impl ISerializable for AacAudioSpecificConfigBox {
@@ -1807,6 +2019,7 @@ pub mod aac_utils {
     }
 }
 
+#[derive(Debug)]
 pub struct AudioExtendedDescriptionBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -1891,6 +2104,7 @@ impl ISerializable for AudioExtendedDescriptionBox {
     }
 }
 
+#[derive(Debug)]
 pub struct Mp4aDescriptionBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -1964,6 +2178,44 @@ impl Mp4aDescriptionBox {
     }
 }
 
+pub struct Mp4aDescriptionBoxBuilder {
+    sample_rate: f32,
+    num_audio_channels: u16,
+    spec_config: aac_utils::AacAudioSpecConfLike,
+}
+
+impl Mp4aDescriptionBoxBuilder {
+    pub fn new() -> Self {
+        Self {
+            sample_rate: 0.0,
+            num_audio_channels: 0,
+            spec_config: aac_utils::AacAudioSpecConfLike::AacAudioSpecificConfig(
+                aac_utils::AacAudioSpecificConfigBox::default()
+            )
+        }
+    }
+
+    pub fn sample_rate(mut self, sample_rate: f32) -> Self {
+        self.sample_rate = sample_rate;
+        self
+    }
+
+    pub fn num_audio_channels(mut self, num_audio_channels: u16) -> Self {
+        self.num_audio_channels = num_audio_channels;
+        self
+    }
+
+    pub fn spec_config(mut self, spec_config: aac_utils::AacAudioSpecConfLike) -> Self {
+        self.spec_config = spec_config;
+        self
+    }
+
+    pub fn build(self) -> Mp4aDescriptionBox {
+        Mp4aDescriptionBox::new(self.sample_rate, self.num_audio_channels, self.spec_config)
+    }
+}
+
+#[derive(Debug)]
 pub struct Mp3DescriptionBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -2015,9 +2267,57 @@ impl ISerializable for Mp3DescriptionBox {
     }
 }
 
+impl Mp3DescriptionBox {
+    pub fn new(sample_rate: f32, num_audio_channels: u16) -> Self {
+        Self {
+            size: 0,
+            box_type: ['m', 'p', '3', 'a'],
+            reserved: [0; 6],
+            data_reference_index: 1,
+            version: 0,
+            revision_level: 0,
+            max_packet_size: 0,
+            num_audio_channels,
+            sample_size: 16,
+            compression_id: 0,
+            packet_size: 0,
+            sample_rate: FixedPoint32::from(sample_rate),
+        }
+    }
+}
+
+pub struct Mp3DescriptionBoxBuilder {
+    sample_rate: f32,
+    num_audio_channels: u16,
+}
+
+impl Mp3DescriptionBoxBuilder {
+    pub fn new() -> Self {
+        Self {
+            sample_rate: 0.0,
+            num_audio_channels: 0,
+        }
+    }
+
+    pub fn sample_rate(mut self, sample_rate: f32) -> Self {
+        self.sample_rate = sample_rate;
+        self
+    }
+
+    pub fn num_audio_channels(mut self, num_audio_channels: u16) -> Self {
+        self.num_audio_channels = num_audio_channels;
+        self
+    }
+
+    pub fn build(self) -> Mp3DescriptionBox {
+        Mp3DescriptionBox::new(self.sample_rate, self.num_audio_channels)
+    }
+}
+
 pub mod avc1_utils {
     use crate::fmpeg::mp4head::ISerializable;
 
+    #[derive(Debug)]
     pub enum AvcCBoxLike {
         AvcCBoxLike(Vec<u8>)
     }
@@ -2038,6 +2338,7 @@ pub mod avc1_utils {
     }
 }
 
+#[derive(Debug)]
 pub struct Avc1DescriptionBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -2134,12 +2435,27 @@ pub struct Avc1DescriptionBoxBuilder {
 }
 
 impl Avc1DescriptionBoxBuilder {
-    pub fn new(width: u16, height: u16, avcc_box: avc1_utils::AvcCBoxLike) -> Self {
+    pub fn new() -> Self {
         Self {
-            width,
-            height,
-            avcc_box,
+            width: 0,
+            height: 0,
+            avcc_box: AvcCBoxLike(vec![]),
         }
+    }
+
+    pub fn avcc_box(mut self, avcc_box: avc1_utils::AvcCBoxLike) -> Self {
+        self.avcc_box = avcc_box;
+        self
+    }
+
+    pub fn set_width(mut self, width: u16) -> Self {
+        self.width = width;
+        self
+    }
+
+    pub fn set_height(mut self, height: u16) -> Self {
+        self.height = height;
+        self
     }
 
     pub fn build(self) -> Avc1DescriptionBox {
@@ -2147,10 +2463,11 @@ impl Avc1DescriptionBoxBuilder {
     }
 }
 
+#[derive(Debug)]
 pub struct TimeToSampleBox;
 
 impl TimeToSampleBox {
-    pub fn new(sample_count: u32) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
@@ -2172,10 +2489,11 @@ impl ISerializable for TimeToSampleBox {
     }
 }
 
+#[derive(Debug)]
 pub struct SampleToChunkBox;
 
 impl SampleToChunkBox {
-    pub fn new(sample_count: u32) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
@@ -2197,10 +2515,11 @@ impl ISerializable for SampleToChunkBox {
     }
 }
 
+#[derive(Debug)]
 pub struct SampleSizeBox;
 
 impl SampleSizeBox {
-    pub fn new(sample_size: u32) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
@@ -2223,10 +2542,11 @@ impl ISerializable for SampleSizeBox {
     }
 }
 
+#[derive(Debug)]
 pub struct ChunkOffsetBox;
 
 impl ChunkOffsetBox {
-    pub fn new(chunk_offset: u32) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }

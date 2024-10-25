@@ -11,9 +11,12 @@ pub fn add(left: u64, right: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use std::collections::{HashMap, VecDeque};
+    use std::io::Write;
     use crate::flv::decoder::Decoder;
     use crate::flv::tag::TagType;
+    use crate::fmpeg::encoder::Encoder;
     use crate::fmpeg::mp4head::{ISerializable, U24};
+    use crate::fmpeg::remux_context::{AudioCodecType, RemuxContext, VideoCodecType};
     use crate::io::bit::UIntParserEndian;
     use super::*;
 
@@ -150,5 +153,36 @@ mod tests {
         // it seems that u16io module works well.
         let mut u24io = U24::from(0x11123456u32);
         dbg!(u24io.serialize());
+
+        let mut remux_context = RemuxContext::new();
+        remux_context.set_header_sent(true);
+        remux_context._set_configured(true);
+        remux_context.width = 1280f64;
+        remux_context.height = 720f64;
+        remux_context.fps = 30f64;
+        remux_context.fps_num = 30000;
+        remux_context.duration_ms = 1000;
+        remux_context.has_audio = true;
+        remux_context.has_video = true;
+        remux_context.audio_codec_id = 2;
+        remux_context.audio_codec_type = AudioCodecType::Aac;
+        remux_context.audio_sample_rate = 48000;
+        remux_context.audio_data_rate = 128;
+        remux_context.audio_channels = 2;
+        remux_context.video_codec_id = 7;
+        remux_context.video_codec_type = VideoCodecType::Avc1;
+        remux_context.major_brand = "isom".to_string();
+        remux_context.minor_version = 512.to_string();
+        remux_context.compatible_brands = vec!["isom".to_string(), "iso6".to_string(), "avc1".to_string(), "mp41".to_string()];
+
+        Encoder::encode_ftyp(&remux_context);
+        Encoder::encode_moov(&remux_context);
+
+        let mut vec = vec![];
+        vec.append(&mut Encoder::encode_ftyp(&remux_context).serialize());
+        vec.append(&mut Encoder::encode_moov(&remux_context).serialize());
+
+        let mut write_file = std::fs::File::create("D:/out.mp4").unwrap();
+        write_file.write(&vec).unwrap();
     }
 }
