@@ -13,6 +13,7 @@ mod tests {
     use std::collections::{HashMap, VecDeque};
     use crate::flv::decoder::Decoder;
     use crate::flv::tag::TagType;
+    use crate::io::bit::U16ParserEndian;
     use super::*;
 
     #[test]
@@ -79,14 +80,15 @@ mod tests {
         assert_eq!(decoder.drain_u64(), 18446744073709551615u64);*/
 
 
-        /*
+
         let core = core::Core::new();
         let mut buf = std::fs::read("D:/test.flv").unwrap();
         let mut decoder = Decoder::new(VecDeque::from(buf));
         dbg!(decoder.decode_header().unwrap());
-        for _ in 0..100 {
-            dbg!(decoder.decode_body_once().unwrap());
-        } */
+        for _ in 0..1 {
+            decoder.drain_u32();
+            dbg!(decoder.decode_tag().unwrap());
+        } /**/
 
 
         // Note: by the way, till this commit, the decoder (especially the AAC part)
@@ -105,5 +107,45 @@ mod tests {
         assert_eq!(TagType::Audio, TagType::Audio);
         assert_eq!(TagType::Video, TagType::Video);
         // now it's tested.
+
+        let mut u16io = io::bit::U16BitIO::new(0x1234, U16ParserEndian::BigEndian);
+        assert_eq!(u16io.read_at(0), false);
+        assert_eq!(u16io.read_at(3), true);
+        assert_eq!(u16io.read_at(7), false);
+        assert_eq!(u16io.read_at(10), true);
+        assert_eq!(u16io.read_at(15), false);
+
+        assert_eq!(u16io.read_range(0, 3), 1);
+        assert_eq!(u16io.read_range(4, 7), 2);
+        assert_eq!(u16io.read_range(6, 11), 0x23);
+        assert_eq!(u16io.read_range(7, 11), 0x03);
+        assert_eq!(u16io.read_range(7, 15), 0x34);
+
+        u16io.write_at(0, true);
+        u16io.write_at(3, false);
+        assert_eq!(u16io.read_range(0, 3), 0b1000);
+
+        u16io.write_range(4, 7, 0b1010);
+        assert_eq!(u16io.read_range(4, 7), 0b1010);
+
+        u16io.write_range(10, 15, 0b101010);
+        assert_eq!(u16io.read_range(10, 15), 0b101010);
+
+        let mut u16io = io::bit::U16BitIO::new(0b1111000000000000, U16ParserEndian::BigEndian);
+        u16io.write_range(0, 4, 0b11011);
+        dbg!(u16io.read_range(0, 3));
+        dbg!(u16io.read_range(4, 7));
+        assert_eq!(u16io.read_range(0, 4), 0b11011);
+
+        // 1101 1000 0000
+        // 0000 0010 1001
+        // 1101 1010 1001
+        u16io.write_range(6, 11, 0b101001);
+        dbg!(u16io.read_range(0, 3), 0b1101);
+        dbg!(u16io.read_range(4, 7), 0b1010);
+        dbg!(u16io.read_range(8, 11), 0b1001);
+        assert_eq!(u16io.read_range(12, 15), 0);
+
+        // it seems that u16io module works well.
     }
 }

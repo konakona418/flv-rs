@@ -41,3 +41,71 @@ impl BitIO {
         (self.byte & mask) >> (7 - end)
     }
 }
+
+pub enum U16ParserEndian {
+    LittleEndian,
+    BigEndian
+}
+pub struct U16BitIO {
+    data: [u8; 2],
+    endian: U16ParserEndian
+}
+
+impl U16BitIO {
+    #[inline]
+    pub fn new(data: u16, endian: U16ParserEndian) -> U16BitIO {
+        let data = match endian {
+            U16ParserEndian::LittleEndian => {
+                data.to_le_bytes()
+            }
+            U16ParserEndian::BigEndian => {
+                data.to_be_bytes()
+            }
+        };
+        Self {
+            data,
+            endian
+        }
+    }
+
+    /// offset is counted from the left of u16.
+    #[inline]
+    pub fn read_at(&mut self, bit_offset: usize) -> bool {
+        let byte_offset = bit_offset / 8;
+        let bit_offset = bit_offset % 8;
+
+        let byte = self.data[byte_offset];
+        let mask = 1 << (7 - bit_offset);
+        byte & mask != 0
+    }
+
+    /// read a range of bits.
+    /// contains both start and end inclusive.
+    #[inline]
+    pub fn read_range(&mut self, start: usize, end: usize) -> u16 {
+        let mut result = 0;
+        for i in start..end + 1 {
+            result |= (self.read_at(i) as u16) << (end - i);
+        }
+        result
+    }
+
+    #[inline]
+    pub fn write_at(&mut self, bit_offset: usize, value: bool) {
+        let byte_offset = bit_offset / 8;
+        let bit_offset = bit_offset % 8;
+        let mask = 1 << (7 - bit_offset);
+        if value {
+            self.data[byte_offset] |= mask;
+        } else {
+            self.data[byte_offset] &= !mask;
+        }
+    }
+
+    #[inline]
+    pub fn write_range(&mut self, start: usize, end: usize, value: u16) {
+        for i in start..end + 1 {
+            self.write_at(i, (value & (1 << (end - i))) != 0);
+        }
+    }
+}
