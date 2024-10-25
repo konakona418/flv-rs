@@ -13,6 +13,7 @@ mod tests {
     use std::collections::{HashMap, VecDeque};
     use crate::flv::decoder::Decoder;
     use crate::flv::tag::TagType;
+    use crate::fmpeg::mp4head::{ISerializable, U24};
     use crate::io::bit::UIntParserEndian;
     use super::*;
 
@@ -147,5 +148,7 @@ mod tests {
         assert_eq!(u16io.read_range(12, 15), 0);
 
         // it seems that u16io module works well.
+        let mut u24io = U24::from(0x11123456u32);
+        dbg!(u24io.serialize());
     }
 }

@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use crate::flv::header::{EncryptionTagHeader, FilterParameters, TagHeader};
 use crate::flv::script::ScriptTagBody;
 use std::fmt::{Debug, Formatter};
@@ -56,8 +57,8 @@ pub enum TagBody {
 
 #[derive(Clone)]
 pub enum NormalTagBody {
-    Audio(Vec<u8>),
-    Video(Vec<u8>),
+    Audio(VecDeque<u8>),
+    Video(VecDeque<u8>),
     Script(ScriptTagBody),
     Placeholder, // todo: temporary
 }

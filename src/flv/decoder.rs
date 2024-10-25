@@ -73,6 +73,12 @@ impl Decoder {
     }
 
     #[inline]
+    pub fn drain_bytes_deque(&mut self, size: usize) -> VecDeque<u8> {
+        let drained = self.data.drain(0..size).collect::<VecDeque<_>>();
+        drained
+    }
+
+    #[inline]
     pub fn drain_u16_le(&mut self) -> u16 {
         let mut result = 0;
         result |= self.drain_u8() as u16;
@@ -283,11 +289,11 @@ impl Decoder {
             TagBody::Normal(match tag_type {
                 TagType::Audio => {
                     tag_header = TagHeader::Audio(AudioTagHeader::parse(self, &mut header_size)?);
-                    NormalTagBody::Audio(self.drain_bytes_vec((data_size as usize) - header_size))
+                    NormalTagBody::Audio(self.drain_bytes_deque((data_size as usize) - header_size))
                 }
                 TagType::Video => {
                     tag_header = TagHeader::Video(VideoTagHeader::parse(self, &mut header_size)?);
-                    NormalTagBody::Video(self.drain_bytes_vec((data_size as usize) - header_size))
+                    NormalTagBody::Video(self.drain_bytes_deque((data_size as usize) - header_size))
                 }
                 TagType::Script => {
                     tag_header = TagHeader::Script;

@@ -25,18 +25,18 @@ pub struct U24 {
 
 impl U24 {
     #[inline]
-    fn new(value: u32) -> Self {
-        Self::from(value)
+    pub fn new(value: u32) -> Self {
+        Self { value }
     }
 
     #[inline]
-    fn from(value: u32) -> U24 {
+    pub fn from(value: u32) -> U24 {
         Self::new(value & 0x00FFFFFF)
     }
 
     #[inline]
-    fn to_u32(&self) -> u32 {
-        self.value
+    pub fn to_u32(&self) -> u32 {
+        self.value & 0x00FFFFFF
     }
 }
 
@@ -51,7 +51,7 @@ impl ISerializable for U24 {
     #[inline]
     fn serialize(&mut self) -> Vec<u8> {
         let mut result = vec![];
-        result.extend_from_slice(&self.value.to_be_bytes()[1..]);
+        result.extend_from_slice(&self.to_u32().to_be_bytes()[1..]);
         assert_eq!(result.len(), 3);
         result
     }

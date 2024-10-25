@@ -5,6 +5,7 @@ use std::collections::VecDeque;
 use std::sync::mpsc;
 use std::thread::JoinHandle;
 use crate::flv::header::FlvHeader;
+use crate::fmpeg::remux_context::RemuxContext;
 
 pub struct Remuxer {
     channel_exchange: Option<mpsc::Sender<Packed>>,
@@ -14,7 +15,9 @@ pub struct Remuxer {
 
     tags: VecDeque<Tag>,
     metadata: Option<RawMetaData>,
-    flv_header: Option<FlvHeader>
+    flv_header: Option<FlvHeader>,
+
+    ctx: RemuxContext,
 }
 
 impl ExchangeRegistrable for Remuxer {
@@ -41,13 +44,22 @@ impl Remuxer {
             remuxing: false,
             tags: VecDeque::new(),
             metadata: None,
-            flv_header: None
+            flv_header: None,
+            ctx: RemuxContext::new(),
         }
     }
 
     #[inline]
     fn set_remuxing(&mut self, flag: bool) {
         self.remuxing = flag;
+    }
+
+    pub fn remux(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        while let Some(tag) = self.tags.pop_front() {
+            // todo: remux
+        }
+
+        Ok(())
     }
 
     pub fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -59,9 +71,11 @@ impl Remuxer {
                             self.tags.push_back(tag);
                         }
                         PackedContentToRemuxer::PushFlvHeader(flv_header) => {
+                            self.ctx.parse_flv_header(&flv_header);
                             self.flv_header = Some(flv_header);
                         }
                         PackedContentToRemuxer::PushMetadata(metadata) => {
+                            self.ctx.parse_metadata(&metadata);
                             self.metadata = Some(metadata);
                         }
                         PackedContentToRemuxer::StartRemuxing => {
@@ -85,7 +99,7 @@ impl Remuxer {
                 continue;
             }
 
-            // remux
+            self.remux()?;
         }
         Ok(())
     }
