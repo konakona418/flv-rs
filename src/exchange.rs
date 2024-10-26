@@ -110,7 +110,7 @@ pub enum PackedContent {
 }
 
 pub enum PackedContentToCore {
-    Data,
+    Data(Vec<u8>),
     Command
 }
 

@@ -332,9 +332,6 @@ impl Decoder {
     }
 
     pub fn decode_body(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let mut dbg_cnt = 0; // todo: this shall be removed.
-        const DEBUGGING: bool = true;
-
         loop {
             if let Ok(received) = self.channel_receiver.recv() {
                 if let PackedContent::ToDecoder(packed_content) = received {
@@ -361,13 +358,6 @@ impl Decoder {
                 // todo: use a better way to replace recv().
                 println!("Channel closed.");
                 return Ok(());
-            }
-
-            if DEBUGGING {
-                if dbg_cnt > 100 {
-                    break;
-                }
-                dbg_cnt += 1;
             }
 
             'decoding: loop {
@@ -408,7 +398,7 @@ impl Decoder {
 
     fn send_to_demuxer(&mut self, pack: Packed) -> Result<(), Box<dyn std::error::Error>> {
         if let Err(e) = self.channel_exchange
-            .clone()
+            .as_ref()
             .unwrap()
             .send(pack) {
             Err(Box::new(e))
