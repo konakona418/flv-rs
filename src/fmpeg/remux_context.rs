@@ -40,6 +40,97 @@ pub struct SampleContext {
     pub sample_size: u32,
 }
 
+pub struct SampleContextBuilder {
+    pub is_leading: bool,
+    pub is_non_sync: bool,
+    pub is_keyframe: bool,
+    pub has_redundancy: bool,
+
+    pub decode_time: u32,
+    pub composition_time_offset: u32,
+    pub sample_duration: u32,
+    pub sample_size: u32,
+}
+
+impl SampleContextBuilder {
+    pub fn new() -> Self {
+        Self {
+            is_leading: false,
+            is_non_sync: false,
+            is_keyframe: false,
+            has_redundancy: false,
+
+            decode_time: 0,
+            composition_time_offset: 0,
+            sample_duration: 0,
+            sample_size: 0,
+        }
+    }
+
+    #[inline]
+    pub fn set_is_leading(&mut self, is_leading: bool) -> &mut Self {
+        self.is_leading = is_leading;
+        self
+    }
+
+    #[inline]
+    pub fn set_is_non_sync(&mut self, is_non_sync: bool) -> &mut Self {
+        self.is_non_sync = is_non_sync;
+        self
+    }
+
+    #[inline]
+    pub fn set_is_keyframe(&mut self, is_keyframe: bool) -> &mut Self {
+        self.is_keyframe = is_keyframe;
+        self
+    }
+
+    #[inline]
+    pub fn set_has_redundancy(&mut self, has_redundancy: bool) -> &mut Self {
+        self.has_redundancy = has_redundancy;
+        self
+    }
+
+    #[inline]
+    pub fn set_decode_time(&mut self, decode_time: u32) -> &mut Self {
+        self.decode_time = decode_time;
+        self
+    }
+
+    #[inline]
+    pub fn set_composition_time_offset(&mut self, composition_time_offset: u32) -> &mut Self {
+        self.composition_time_offset = composition_time_offset;
+        self
+    }
+
+    #[inline]
+    pub fn set_sample_duration(&mut self, sample_duration: u32) -> &mut Self {
+        self.sample_duration = sample_duration;
+        self
+    }
+
+    #[inline]
+    pub fn set_sample_size(&mut self, sample_size: u32) -> &mut Self {
+        self.sample_size = sample_size;
+        self
+    }
+
+    #[inline]
+    pub fn build(&self) -> SampleContext {
+        SampleContext {
+            is_leading: self.is_leading,
+            is_non_sync: self.is_non_sync,
+            is_keyframe: self.is_keyframe,
+            has_redundancy: self.has_redundancy,
+
+            decode_time: self.decode_time,
+            composition_time_offset: self.composition_time_offset,
+            sample_duration: self.sample_duration,
+            sample_size: self.sample_size,
+        }
+    }
+}
+
 pub const TIME_SCALE: u32 = 1000;
 
 pub struct RemuxContext {
@@ -76,9 +167,6 @@ pub struct RemuxContext {
     pub major_brand: String,
     pub minor_version: String,
     pub compatible_brands: Vec<String>,
-
-    pub audio_track: TrackContext,
-    pub video_track: TrackContext,
 
     header_sent: bool,
     flv_header_configured: bool,
@@ -147,9 +235,6 @@ impl RemuxContext {
 
             video_codec_type: VideoCodecType::None,
             audio_codec_type: AudioCodecType::None,
-
-            audio_track: TrackContext::new(DEFAULT_AUDIO_TRACK_ID, TrackType::Audio),
-            video_track: TrackContext::new(DEFAULT_VIDEO_TRACK_ID, TrackType::Video),
 
             header_sent: false,
             flv_header_configured: false,

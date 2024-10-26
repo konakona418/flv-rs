@@ -1,12 +1,16 @@
-use crate::exchange::{ExchangeRegistrable, Packed, PackedContent, PackedContentToRemuxer};
+use std::cmp::PartialEq;
+use crate::exchange::{Destination, ExchangeRegistrable, Packed, PackedContent, PackedContentToRemuxer};
 use crate::flv::meta::RawMetaData;
 use crate::flv::tag::{Tag, TagType};
 use std::collections::VecDeque;
 use std::sync::mpsc;
 use std::thread::JoinHandle;
+use crate::exchange::PackedContentToCore::Data;
 use crate::flv::header::FlvHeader;
-use crate::fmpeg::parser::Parser;
-use crate::fmpeg::remux_context::RemuxContext;
+use crate::fmpeg::encoder::{Encoder, DEFAULT_AUDIO_TRACK_ID, DEFAULT_VIDEO_TRACK_ID};
+use crate::fmpeg::mp4head::ISerializable;
+use crate::fmpeg::parser::{parse_aac_timescale, parse_avc_timescale, parse_mp3_timescale, parse_timescale, AudioParseResult, Avc1ParseResult, KeyframeType, Parser, VideoParseResult};
+use crate::fmpeg::remux_context::{RemuxContext, SampleContext, SampleContextBuilder, TrackContext, TrackType};
 
 pub struct Remuxer {
     channel_exchange: Option<mpsc::Sender<Packed>>,
@@ -19,6 +23,9 @@ pub struct Remuxer {
     flv_header: Option<FlvHeader>,
 
     ctx: RemuxContext,
+
+    audio_track: TrackContext,
+    video_track: TrackContext,
 }
 
 impl ExchangeRegistrable for Remuxer {
@@ -30,8 +37,18 @@ impl ExchangeRegistrable for Remuxer {
         self.channel_sender.clone()
     }
 
-    fn get_self_as_destination(&self) -> crate::exchange::Destination {
-        crate::exchange::Destination::Remuxer
+    fn get_self_as_destination(&self) -> Destination {
+        Destination::Remuxer
+    }
+}
+
+impl PartialEq for KeyframeType {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (KeyframeType::Keyframe, KeyframeType::Keyframe) => true,
+            (KeyframeType::Interframe, KeyframeType::Interframe) => true,
+            _ => false
+        }
     }
 }
 
@@ -47,6 +64,10 @@ impl Remuxer {
             metadata: None,
             flv_header: None,
             ctx: RemuxContext::new(),
+
+
+            audio_track: TrackContext::new(DEFAULT_AUDIO_TRACK_ID, TrackType::Audio),
+            video_track: TrackContext::new(DEFAULT_VIDEO_TRACK_ID, TrackType::Video),
         }
     }
 
@@ -55,13 +76,36 @@ impl Remuxer {
         self.remuxing = flag;
     }
 
-    fn send_mpeg4_header(&mut self) {
-        // todo: send avc header
+    fn send(&mut self, pack: Packed) -> Result<(), Box<dyn std::error::Error>> {
+        match self.channel_exchange.as_ref().unwrap().send(pack) {
+            Ok(_) => Ok(()),
+            Err(e) => Err("Channel closed.".into())
+        }
+    }
+
+    fn send_mpeg4_header(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let mut header = Encoder::encode_ftyp(&self.ctx).serialize();
+        header.append(&mut Encoder::encode_moov(&self.ctx).serialize());
+        self.send(
+            Packed {
+                packed_routing: Destination::Core,
+                packed_content: PackedContent::ToCore(Data(header)),
+            }
+        )
+    }
+
+    fn send_raw_data(&mut self, data: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
+        self.send(
+            Packed {
+                packed_routing: Destination::Core,
+                packed_content: PackedContent::ToCore(Data(data)),
+            }
+        )
     }
 
     fn remux(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.ctx.is_configured() && !self.ctx.is_header_sent() {
-            // todo: send mpeg4 header
+            self.send_mpeg4_header()?;
         }
 
         while let Some(ref tag) = self.tags.pop_front() {
@@ -70,9 +114,37 @@ impl Remuxer {
                     let parsed = Parser::parse_audio(tag)?;
                     if self.ctx.is_configured() {
                         if !self.ctx.is_header_sent() {
-                            // todo: send header
+                            self.send_mpeg4_header()?;
                         }
-                        // todo: send audio data
+                        match parsed {
+                            AudioParseResult::AacRaw(raw) => {
+                                let mut sample_ctx = SampleContextBuilder::new()
+                                    .set_decode_time(parse_timescale(parse_timescale(tag.timestamp)))
+                                    .set_sample_size(raw.len() as u32)
+                                    .set_sample_duration(parse_aac_timescale(self.ctx.audio_sample_rate))
+                                    .set_composition_time_offset(0)
+                                    .build();
+
+                                let mut data = Encoder::encode_moof(&mut self.ctx, &mut self.audio_track, &mut sample_ctx).serialize();
+                                data.append(&mut Encoder::encode_mdat(Vec::from(raw)).serialize());
+                                self.send_raw_data(data)?;
+                            }
+                            AudioParseResult::Mp3(parsed) => {
+                                let mut sample_ctx = SampleContextBuilder::new()
+                                    .set_decode_time(parse_timescale(parse_timescale(tag.timestamp)))
+                                    .set_sample_size(parsed.body.len() as u32)
+                                    .set_sample_duration(parse_mp3_timescale(parsed.sample_rate, parsed.version))
+                                    .set_composition_time_offset(0)
+                                    .build();
+
+                                let mut data = Encoder::encode_moof(&mut self.ctx, &mut self.audio_track, &mut sample_ctx).serialize();
+                                data.append(&mut Encoder::encode_mdat(parsed.body).serialize());
+                                self.send_raw_data(data)?;
+                            }
+                            _ => {
+                                panic!("Aac format header not set!")
+                            }
+                        }
                     } else {
                         self.ctx.configure_audio_metadata(&parsed)
                     }
@@ -81,16 +153,41 @@ impl Remuxer {
                     let parsed = Parser::parse_video(tag)?;
                     if self.ctx.is_configured() {
                         if !self.ctx.is_header_sent() {
-                            // todo: send header
+                            self.send_mpeg4_header()?;
                         }
-                        // todo: send video data
+                        if let VideoParseResult::Avc1(parsed) = parsed {
+                            match parsed {
+                                Avc1ParseResult::AvcNalu(data) => {
+                                    let mut sample_ctx = SampleContextBuilder::new()
+                                        .set_decode_time(parse_timescale(tag.timestamp))
+                                        .set_sample_size(data.payload.len() as u32)
+                                        .set_sample_duration(parse_avc_timescale(self.ctx.fps as f32))
+                                        .set_composition_time_offset(0)
+                                        .set_has_redundancy(false)
+                                        .set_is_leading(self.video_track.sequence_number == 1)
+                                        .set_is_keyframe(data.keyframe_type == KeyframeType::Keyframe)
+                                        .set_is_non_sync(data.keyframe_type == KeyframeType::Interframe)
+                                        .build();
+
+                                    let mut send_data = Encoder::encode_moof(&mut self.ctx, &mut self.video_track, &mut sample_ctx).serialize();
+                                    send_data.append(&mut Encoder::encode_mdat(Vec::from(data.payload)).serialize());
+                                    self.send_raw_data(send_data)?;
+                                }
+                                Avc1ParseResult::AvcSequenceHeader(_) => {
+                                    panic!("Avc sequence header not set!")
+                                }
+                                Avc1ParseResult::AvcEndOfSequence => {
+                                    // todo: handle end of sequence
+                                    println!("End of sequence.")
+                                }
+                            }
+                        }
                     } else {
                         self.ctx.configure_video_metadata(&parsed)
                     }
                 }
                 TagType::Script => {}
                 TagType::Encryption => {}
-                // todo: fill these.
             }
         }
 

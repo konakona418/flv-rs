@@ -155,7 +155,7 @@ impl Encoder {
 
     // todo: implement moof & mdat encoding.
 
-    pub fn encode_moof(ctx: &RemuxContext, track_ctx: &mut TrackContext, encoding_ctx: &SampleContext) -> MovieFragmentBox {
+    pub fn encode_moof(ctx: &mut RemuxContext, track_ctx: &mut TrackContext, encoding_ctx: &mut SampleContext) -> MovieFragmentBox {
         let mut moof = MovieFragmentBox::new(
             track_ctx.sequence_number,
             Self::encode_traf(ctx, track_ctx, encoding_ctx),
@@ -164,7 +164,7 @@ impl Encoder {
         moof
     }
 
-    fn encode_traf(ctx: &RemuxContext, track_ctx: &mut TrackContext, encoding_ctx: &SampleContext) -> TrackFragmentBox {
+    fn encode_traf(ctx: &mut RemuxContext, track_ctx: &mut TrackContext, encoding_ctx: &mut SampleContext) -> TrackFragmentBox {
         let traf = TrackFragmentBoxBuilder::new()
             .with_track_id(track_ctx.track_id)
             .with_media_decode_time(encoding_ctx.decode_time) // dts

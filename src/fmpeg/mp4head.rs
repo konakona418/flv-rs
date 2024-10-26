@@ -533,7 +533,6 @@ impl MovieHeaderBoxV0Builder {
 
     #[inline]
     pub fn timescale(mut self, timescale: u32) -> Self {
-        // todo: timescale conversion (from milli sec of FLV to timescale of fMpeg4)
         self.timescale = timescale;
         self
     }
@@ -708,7 +707,6 @@ impl MovieHeaderBoxV1Builder {
 
     #[inline]
     pub fn timescale(mut self, timescale: u32) -> Self {
-        // todo: timescale conversion (from milli sec of FLV to timescale of fMpeg4)
         self.timescale = timescale;
         self
     }
@@ -2575,8 +2573,6 @@ impl ISerializable for ChunkOffsetBox {
 }
 
 // above are the implementation of file head.
-
-// todo: implement mvex (movie extend box)
 
 #[derive(Debug)]
 pub struct MovieExtendBox {

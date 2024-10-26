@@ -4,12 +4,53 @@ use crate::flv::tag::{NormalTagBody, Tag, TagBody};
 use crate::fmpeg::remux_context::TIME_SCALE;
 use crate::io;
 
+#[inline]
 pub fn parse_timescale(timestamp_ms: u32) -> u32 {
     if TIME_SCALE == 1000 {
         timestamp_ms
     } else {
         timestamp_ms * TIME_SCALE / 1000
     }
+}
+
+#[inline]
+fn parse_timescale_accurate(timestamp_ms: f32) -> u32 {
+    if TIME_SCALE == 1000 {
+        timestamp_ms as u32
+    } else {
+        (timestamp_ms * TIME_SCALE as f32 / 1000.0) as u32
+    }
+}
+
+#[inline]
+pub fn parse_mp3_timescale(sample_rate: u32, mp3version: Mp3Version) -> u32 {
+    // todo: test this.
+    match mp3version {
+        Mp3Version::Mp25 => {
+            parse_timescale_accurate(576000.0 / sample_rate as f32)
+        }
+        Mp3Version::Mp20 => {
+            parse_timescale_accurate(576000.0 / sample_rate as f32)
+        }
+        Mp3Version::Mp10 => {
+            parse_timescale_accurate(1152000.0 / sample_rate as f32)
+        }
+        Mp3Version::Reserved => {
+            panic!("Invalid mp3 version.");
+        }
+    }
+}
+
+#[inline]
+pub fn parse_aac_timescale(sample_rate: u32) -> u32 {
+    // todo: test this.
+    // this may be incorrect.
+    parse_timescale_accurate(1024000.0 / sample_rate as f32)
+}
+
+#[inline]
+pub fn parse_avc_timescale(fps: f32) -> u32 {
+    parse_timescale_accurate(1000.0 / fps as f32)
 }
 
 pub enum AudioParseResult {
@@ -118,6 +159,8 @@ pub struct Mp3ParseResult {
     pub bitrate: u32,
     pub channel: Channel,
     pub channel_extended: u8,
+
+    pub body: Vec<u8>,
 }
 
 pub const AUDIO_SAMPLE_RATE_TABLE_M10: [u32; 4] = [44100, 48000, 32000, 0];
@@ -234,6 +277,7 @@ impl Parser {
             bitrate,
             channel,
             channel_extended,
+            body: Vec::from(body.clone()),
         }))
     }
 
@@ -341,6 +385,4 @@ impl Parser {
             })
         }
     }
-
-    // todo: implement video parsing.
 }
