@@ -119,7 +119,7 @@ impl TrackFragmentBoxBuilder {
         self
     }
 
-    pub fn with_base_media_decode_time(mut self, base_media_decode_time: u32) -> TrackFragmentBoxBuilder {
+    pub fn with_media_decode_time(mut self, base_media_decode_time: u32) -> TrackFragmentBoxBuilder {
         self.track_fragment_decode_time_box.base_media_decode_time = base_media_decode_time;
         self
     }
@@ -131,6 +131,11 @@ impl TrackFragmentBoxBuilder {
 
     pub fn with_sample_table_box(mut self, sample_table_box: SampleDependencyTableBoxBuilder) -> TrackFragmentBoxBuilder {
         self.sample_table_box = sample_table_box.as_box();
+        self
+    }
+
+    pub fn with_track_run_box(mut self, track_run_box: TrackRunBox) -> TrackFragmentBoxBuilder {
+        self.track_run_box = track_run_box;
         self
     }
 

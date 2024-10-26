@@ -12,7 +12,6 @@ pub enum TrackType {
 pub struct TrackContext {
     pub track_id: u32,
     pub sequence_number: u32,
-    pub base_media_decode_time: u32,
 
     pub track_type: TrackType,
 }
@@ -22,17 +21,23 @@ impl TrackContext {
         Self {
             track_id,
             sequence_number: 1,
-            base_media_decode_time: 0,
             track_type,
         }
     }
 }
 
-pub struct EncodingContext {
+pub struct SampleContext {
     pub is_leading: bool,
     pub is_non_sync: bool,
     pub is_keyframe: bool,
     pub has_redundancy: bool,
+
+    pub decode_time: u32,
+    pub composition_time_offset: u32, // most of the time this can be set to 0.
+    // dts   +  cts    =   pts
+    // decode   offset     presentation
+    pub sample_duration: u32,
+    pub sample_size: u32,
 }
 
 pub const TIME_SCALE: u32 = 1000;

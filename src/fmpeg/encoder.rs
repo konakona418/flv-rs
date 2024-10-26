@@ -1,8 +1,8 @@
-use crate::fmpeg::mp4frag::{MovieDataBox, MovieFragmentBox, SampleDependencyTableBoxBuilder, SampleFlagBuilder, TrackFragmentBox, TrackFragmentBoxBuilder};
+use crate::fmpeg::mp4frag::{MovieDataBox, MovieFragmentBox, SampleDependencyTableBoxBuilder, SampleFlagBuilder, TrackFragmentBox, TrackFragmentBoxBuilder, TrackRunBoxBuilder};
 use crate::fmpeg::mp4head;
 use crate::fmpeg::mp4head::aac_utils::AacAudioSpecConfLike;
 use crate::fmpeg::mp4head::{AudioMediaHandlerBox, FileTypeBox, FixedPoint32, HandlerType, MediaBox, MovieBox, MovieHeaderBox, SampleBoxTableBox, VideoMediaHandlerBox, XMediaHandlerBox};
-use crate::fmpeg::remux_context::{AudioCodecType, EncodingContext, RemuxContext, TrackContext, TrackType, VideoCodecType, TIME_SCALE};
+use crate::fmpeg::remux_context::{AudioCodecType, SampleContext, RemuxContext, TrackContext, TrackType, VideoCodecType, TIME_SCALE};
 
 pub struct Encoder;
 
@@ -155,25 +155,19 @@ impl Encoder {
 
     // todo: implement moof & mdat encoding.
 
-    pub fn encode_moof(ctx: &RemuxContext, track_ctx: &mut TrackContext, encoding_ctx: &EncodingContext) -> MovieFragmentBox {
-        MovieFragmentBox::new(
+    pub fn encode_moof(ctx: &RemuxContext, track_ctx: &mut TrackContext, encoding_ctx: &SampleContext) -> MovieFragmentBox {
+        let mut moof = MovieFragmentBox::new(
             track_ctx.sequence_number,
             Self::encode_traf(ctx, track_ctx, encoding_ctx),
-        )
+        );
+        moof.deferred_set_trun_size();
+        moof
     }
 
-    fn encode_traf(ctx: &RemuxContext, track_ctx: &mut TrackContext, encoding_ctx: &EncodingContext) -> TrackFragmentBox {
+    fn encode_traf(ctx: &RemuxContext, track_ctx: &mut TrackContext, encoding_ctx: &SampleContext) -> TrackFragmentBox {
         let traf = TrackFragmentBoxBuilder::new()
             .with_track_id(track_ctx.track_id)
-            .with_base_media_decode_time(track_ctx.base_media_decode_time)
-            .with_sample_options(
-                SampleFlagBuilder::new()
-                    .set_is_leading(encoding_ctx.is_leading)
-                    .set_is_non_sync(encoding_ctx.is_non_sync)
-                    .set_sample_has_redundancy(encoding_ctx.has_redundancy)
-                    .set_sample_depends_on(!encoding_ctx.is_keyframe)
-                    .set_sample_is_depended_on(encoding_ctx.is_keyframe)
-            )
+            .with_media_decode_time(encoding_ctx.decode_time) // dts
             .with_sample_table_box(
                 match track_ctx.track_type {
                     TrackType::Video => {
@@ -185,6 +179,23 @@ impl Encoder {
                     },
                     TrackType::Audio => SampleDependencyTableBoxBuilder::Audio,
                 }
+            )
+            .with_track_run_box(
+                TrackRunBoxBuilder::new()
+                    .with_data_offset(0)
+                    .with_sample_composition_time_offset(encoding_ctx.composition_time_offset) // pts-dts
+                    .with_sample_size(encoding_ctx.sample_size)
+                    .with_sample_duration(encoding_ctx.sample_duration)
+                    .with_sample_flags(
+                        SampleFlagBuilder::new()
+                            .set_is_leading(encoding_ctx.is_leading)
+                            .set_is_non_sync(encoding_ctx.is_non_sync)
+                            .set_sample_has_redundancy(encoding_ctx.has_redundancy)
+                            .set_sample_depends_on(!encoding_ctx.is_keyframe)
+                            .set_sample_is_depended_on(encoding_ctx.is_keyframe)
+                            .build()
+                    )
+                    .build()
             )
             .build();
         dbg!(&traf);
