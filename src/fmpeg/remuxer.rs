@@ -27,6 +27,8 @@ pub struct Remuxer {
 
     audio_track: TrackContext,
     video_track: TrackContext,
+
+    _temp: Option<Vec<u8>>
 }
 
 impl ExchangeRegistrable for Remuxer {
@@ -69,6 +71,8 @@ impl Remuxer {
 
             audio_track: TrackContext::new(DEFAULT_AUDIO_TRACK_ID, TrackType::Audio),
             video_track: TrackContext::new(DEFAULT_VIDEO_TRACK_ID, TrackType::Video),
+
+            _temp: None
         }
     }
 
@@ -109,6 +113,9 @@ impl Remuxer {
     fn remux(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.ctx.is_configured() && !self.ctx.is_header_sent() {
             self.send_mpeg4_header()?;
+            if let Some(tmp) = self._temp.take() {
+                self.send_raw_data(tmp)?;
+            }
         }
 
         while let Some(ref tag) = self.tags.pop_front() {
@@ -118,6 +125,9 @@ impl Remuxer {
                     if self.ctx.is_configured() {
                         if !self.ctx.is_header_sent() {
                             self.send_mpeg4_header()?;
+                            if let Some(tmp) = self._temp.take() {
+                                self.send_raw_data(tmp)?;
+                            }
                         }
                         match parsed {
                             AudioParseResult::AacRaw(raw) => {
@@ -149,7 +159,19 @@ impl Remuxer {
                             }
                         }
                     } else {
-                        self.ctx.configure_audio_metadata(&parsed)
+                        self.ctx.configure_audio_metadata(&parsed);
+                        if let AudioParseResult::Mp3(parsed) = parsed {
+                            let mut sample_ctx = SampleContextBuilder::new()
+                                .set_decode_time(parse_timescale(parse_timescale(tag.timestamp)))
+                                .set_sample_size(parsed.body.len() as u32)
+                                .set_sample_duration(parse_mp3_timescale(parsed.sample_rate, parsed.version))
+                                .set_composition_time_offset(0)
+                                .build();
+
+                            let mut data = Encoder::encode_moof(&mut self.ctx, &mut self.audio_track, &mut sample_ctx).serialize();
+                            data.append(&mut Encoder::encode_mdat(parsed.body).serialize());
+                            self._temp = Some(data);
+                        }
                     }
                 }
                 TagType::Video => {
@@ -157,6 +179,9 @@ impl Remuxer {
                     if self.ctx.is_configured() {
                         if !self.ctx.is_header_sent() {
                             self.send_mpeg4_header()?;
+                            if let Some(tmp) = self._temp.take() {
+                                self.send_raw_data(tmp)?;
+                            }
                         }
                         if let VideoParseResult::Avc1(parsed) = parsed {
                             match parsed {
