@@ -340,12 +340,15 @@ impl Decoder {
                             self.data.append(&mut data)
                         }
                         PackedContentToDecoder::StartDecoding => {
+                            println!("Start decoding.");
                             self.set_decoding(true);
                         }
                         PackedContentToDecoder::StopDecoding => {
+                            println!("Stop decoding.");
                             self.set_decoding(false);
                         }
                         PackedContentToDecoder::CloseWorkerThread => {
+                            println!("Closing worker thread.");
                             break;
                         }
                         PackedContentToDecoder::Now => {

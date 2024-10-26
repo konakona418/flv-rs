@@ -103,23 +103,29 @@ impl Remuxer {
                 if let PackedContent::ToRemuxer(content) = received {
                     match content {
                         PackedContentToRemuxer::PushTag(tag) => {
+                            // println!("Pushed tag.");
                             self.tags.push_back(tag);
                         }
                         PackedContentToRemuxer::PushFlvHeader(flv_header) => {
+                            println!("Pushed flv header.");
                             self.ctx.parse_flv_header(&flv_header);
                             self.flv_header = Some(flv_header);
                         }
                         PackedContentToRemuxer::PushMetadata(metadata) => {
+                            println!("Pushed metadata.");
                             self.ctx.parse_metadata(&metadata);
                             self.metadata = Some(metadata);
                         }
                         PackedContentToRemuxer::StartRemuxing => {
+                            println!("Start remuxing.");
                             self.set_remuxing(true)
                         }
                         PackedContentToRemuxer::StopRemuxing => {
+                            println!("Stop remuxing.");
                             self.set_remuxing(false)
                         }
                         PackedContentToRemuxer::CloseWorkerThread => {
+                            println!("Closing remuxer thread.");
                             break;
                         }
                         PackedContentToRemuxer::Now => { }

@@ -128,15 +128,19 @@ impl Demuxer {
                                 self.process_incoming_tag(tag);
                             }
                             PackedContentToDemuxer::PushFlvHeader(flv_header) => {
+                                println!("Received flv header.");
                                 self.cache_flv_header = Some(flv_header);
                             }
                             PackedContentToDemuxer::StartDemuxing => {
+                                println!("Start demuxing.");
                                 self.set_demuxing(true);
                             }
                             PackedContentToDemuxer::StopDemuxing => {
+                                println!("Stop demuxing.");
                                 self.set_demuxing(false);
                             }
                             PackedContentToDemuxer::CloseWorkerThread => {
+                                println!("Close worker thread.");
                                 break;
                             }
                             PackedContentToDemuxer::Now => {
