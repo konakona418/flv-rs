@@ -53,6 +53,11 @@ pub struct U16BitIO {
 
 impl U16BitIO {
     #[inline]
+    pub fn get_data(&self) -> [u8; 2] {
+        self.data
+    }
+
+    #[inline]
     pub fn new(data: u16, endian: UIntParserEndian) -> U16BitIO {
         let data = match endian {
             UIntParserEndian::LittleEndian => {
@@ -116,6 +121,11 @@ pub struct U32BitIO {
 }
 
 impl U32BitIO {
+    #[inline]
+    pub fn get_data(&self) -> [u8; 4] {
+        self.data
+    }
+
     #[inline]
     pub fn new(data: u32, endian: UIntParserEndian) -> U32BitIO {
         let data = match endian {
