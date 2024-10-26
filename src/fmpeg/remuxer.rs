@@ -3,6 +3,7 @@ use crate::exchange::{Destination, ExchangeRegistrable, Packed, PackedContent, P
 use crate::flv::meta::RawMetaData;
 use crate::flv::tag::{Tag, TagType};
 use std::collections::VecDeque;
+use std::ptr::eq;
 use std::sync::mpsc;
 use std::thread::JoinHandle;
 use crate::exchange::PackedContentToCore::Data;
@@ -39,12 +40,6 @@ impl ExchangeRegistrable for Remuxer {
 
     fn get_self_as_destination(&self) -> Destination {
         Destination::Remuxer
-    }
-
-    fn launch_worker_thread(mut self) -> JoinHandle<()> {
-        std::thread::spawn(move || {
-            self.run().unwrap();
-        })
     }
 }
 
@@ -92,6 +87,8 @@ impl Remuxer {
     fn send_mpeg4_header(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut header = Encoder::encode_ftyp(&self.ctx).serialize();
         header.append(&mut Encoder::encode_moov(&self.ctx).serialize());
+        self.ctx.set_header_sent(true);
+
         self.send(
             Packed {
                 packed_routing: Destination::Core,
@@ -210,26 +207,26 @@ impl Remuxer {
                             self.tags.push_back(tag);
                         }
                         PackedContentToRemuxer::PushFlvHeader(flv_header) => {
-                            println!("Pushed flv header.");
+                            println!("[Remuxer] Pushed flv header.");
                             self.ctx.parse_flv_header(&flv_header);
                             self.flv_header = Some(flv_header);
                         }
                         PackedContentToRemuxer::PushMetadata(metadata) => {
-                            println!("Pushed metadata.");
+                            println!("[Remuxer] Pushed metadata.");
                             self.ctx.parse_metadata(&metadata);
                             self.metadata = Some(metadata);
                         }
                         PackedContentToRemuxer::StartRemuxing => {
-                            println!("Start remuxing.");
+                            println!("[Remuxer] Start remuxing.");
                             self.set_remuxing(true)
                         }
                         PackedContentToRemuxer::StopRemuxing => {
-                            println!("Stop remuxing.");
+                            println!("[Remuxer] Stop remuxing.");
                             self.set_remuxing(false)
                         }
                         PackedContentToRemuxer::CloseWorkerThread => {
-                            println!("Closing remuxer thread.");
-                            break;
+                            println!("[Remuxer] Closing remuxer thread.");
+                            return Ok(());
                         }
                         PackedContentToRemuxer::Now => { }
                     }
@@ -243,16 +240,23 @@ impl Remuxer {
                 continue;
             }
 
-            if self.ctx.is_configured() {
-                if self.ctx.is_header_sent() {
-                    self.remux()?;
-                } else {
-                    self.send_mpeg4_header();
+            if self.ctx.is_metadata_complete() {
+                if self.remux().is_err() {
+                    println!("Channel closed");
+                    break;
                 }
             } else {
                 println!("Not configured yet.");
             }
         }
         Ok(())
+    }
+
+    pub fn launch_worker_thread(mut self) -> JoinHandle<()> {
+        std::thread::spawn(move || {
+            if let Err(e) = self.run() {
+                panic!("Remuxer worker thread stopped unexpectedly: {}", e)
+            }
+        })
     }
 }

@@ -210,7 +210,7 @@ impl Default for FileTypeBox {
             box_type: ['f', 't', 'y', 'p'],
             major_brand: ['m', 'p', '4', '2'],
             minor_version: 0,
-            compatible_brands: vec![['m', 'p', '4', '2']],
+            compatible_brands: vec![],
         }
     }
 }
@@ -248,7 +248,7 @@ impl FileTypeBoxBuilder {
         Self {
             major_brand: ['m', 'p', '4', '2'],
             minor_version: 0,
-            compatible_brands: vec![['m', 'p', '4', '2']],
+            compatible_brands: vec![],
         }
     }
 
@@ -272,6 +272,7 @@ impl FileTypeBoxBuilder {
 
     #[inline]
     pub fn compatible_brands(mut self, compatible_brands: Vec<String>) -> Self {
+        self.compatible_brands.clear();
         for brand in compatible_brands {
             self.compatible_brands.push(Utils::slice_to_char_array(&*brand));
         }
@@ -2275,7 +2276,7 @@ impl Mp3DescriptionBox {
     pub fn new(sample_rate: f32, num_audio_channels: u16) -> Self {
         Self {
             size: 0,
-            box_type: ['m', 'p', '3', 'a'],
+            box_type: ['.', 'm', 'p', '3'],
             reserved: [0; 6],
             data_reference_index: 1,
             version: 0,

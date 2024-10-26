@@ -128,20 +128,20 @@ impl Demuxer {
                                 self.process_incoming_tag(tag);
                             }
                             PackedContentToDemuxer::PushFlvHeader(flv_header) => {
-                                println!("Received flv header.");
+                                println!("[Demuxer] Received flv header.");
                                 self.cache_flv_header = Some(flv_header);
                             }
                             PackedContentToDemuxer::StartDemuxing => {
-                                println!("Start demuxing.");
+                                println!("[Demuxer] Start demuxing.");
                                 self.set_demuxing(true);
                             }
                             PackedContentToDemuxer::StopDemuxing => {
-                                println!("Stop demuxing.");
+                                println!("[Demuxer] Stop demuxing.");
                                 self.set_demuxing(false);
                             }
                             PackedContentToDemuxer::CloseWorkerThread => {
-                                println!("Close worker thread.");
-                                break;
+                                println!("[Demuxer] Close worker thread.");
+                                return Ok(());
                             }
                             PackedContentToDemuxer::Now => {
                                 // just to temporarily remove thread blockage.
@@ -164,6 +164,16 @@ impl Demuxer {
         }
         Ok(())
     }
+
+    /// Launch a worker thread, move the self into it.
+    /// Note that the data stream will not be sent unless the StartDemuxing command is sent.
+    pub fn launch_worker_thread(mut self) -> JoinHandle<()> {
+        std::thread::spawn(move || {
+            if let Err(e) = self.run() {
+                panic!("Demuxer worker thread stopped unexpectedly: {}", e);
+            }
+        })
+    }
 }
 
 impl ExchangeRegistrable for Demuxer {
@@ -177,13 +187,5 @@ impl ExchangeRegistrable for Demuxer {
 
     fn get_self_as_destination(&self) -> Destination {
         Destination::Demuxer
-    }
-
-    /// Launch a worker thread, move the self into it.
-    /// Note that the data stream will not be sent unless the StartDemuxing command is sent.
-    fn launch_worker_thread(mut self) -> JoinHandle<()> {
-        std::thread::spawn(move || {
-            self.run().unwrap();
-        })
     }
 }

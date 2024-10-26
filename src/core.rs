@@ -1,7 +1,6 @@
 use crate::exchange::{Destination, ExchangeRegistrable, Packed, PackedContent, PackedContentToCore, PackedContentToDecoder, PackedContentToDemuxer, PackedContentToRemuxer};
 use std::collections::VecDeque;
 use std::sync::mpsc;
-use std::thread::JoinHandle;
 
 pub struct Core {
     channel_exchange: Option<mpsc::Sender<Packed>>,
@@ -218,13 +217,9 @@ impl ExchangeRegistrable for Core {
     fn get_self_as_destination(&self) -> Destination {
         Destination::Core
     }
-
-    fn launch_worker_thread(self) -> JoinHandle<()> {
-        todo!()
-    }
 }
 
-impl IConsumer for Core {
+impl IConsumable for Core {
     type ConsumerData = Vec<u8>;
 
     fn consume(&mut self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
@@ -244,7 +239,7 @@ impl IConsumer for Core {
     }
 }
 
-pub trait IConsumer {
+pub trait IConsumable {
     type ConsumerData;
     fn consume(&mut self) -> Result<Self::ConsumerData, Box<dyn std::error::Error>>;
 }

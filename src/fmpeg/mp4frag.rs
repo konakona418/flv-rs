@@ -297,7 +297,8 @@ impl ISerializable for SampleDependencyTableBox {
         result.extend_from_slice(&self.flags.serialize());
 
         result.push(self.sample_dependency_flags);
-        assert_eq!(result.len(), 16);
+        // todo: this is a simplified version which supports only one sample per sample entry.
+        assert_eq!(result.len(), 13);
         result
     }
 
@@ -478,12 +479,12 @@ impl ISerializable for TrackRunBox {
         result.extend_from_slice(&self.sample_flags.to_be_bytes());
         result.extend_from_slice(&self.reserved.to_be_bytes());
         result.extend_from_slice(&self.sample_composition_time_offset.to_be_bytes());
-        assert_eq!(result.len(), 32);
+        assert_eq!(result.len(), 36);
         result
     }
 
     fn size(&self) -> u32 {
-        16 + 16
+        16 + 16 + 4
     }
 }
 

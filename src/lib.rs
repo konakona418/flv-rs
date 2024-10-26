@@ -12,12 +12,17 @@ pub fn add(left: u64, right: u64) -> u64 {
 mod tests {
     use std::collections::{HashMap, VecDeque};
     use std::io::Write;
+    use std::thread;
+    use std::time::Duration;
     use crate::flv::decoder::Decoder;
+    use crate::flv::demuxer::Demuxer;
     use crate::flv::tag::TagType;
     use crate::fmpeg::encoder::Encoder;
     use crate::fmpeg::mp4head::{ISerializable, U24};
     use crate::fmpeg::remux_context::{AudioCodecType, RemuxContext, VideoCodecType};
+    use crate::fmpeg::remuxer::Remuxer;
     use crate::io::bit::UIntParserEndian;
+    use crate::core::IConsumable;
     use super::*;
 
     #[test]
@@ -184,5 +189,49 @@ mod tests {
 
         let mut write_file = std::fs::File::create("D:/out.mp4").unwrap();
         write_file.write(&vec).unwrap();
+    }
+
+    #[test]
+    fn test_all() {
+        let mut buf = std::fs::read("D:/test.flv").unwrap();
+
+        let mut exchange = exchange::Exchange::new();
+
+        let mut core = core::Core::new();
+        exchange.register(&mut core);
+
+        let mut decoder = Decoder::new(VecDeque::from(buf));
+        exchange.register(&mut decoder);
+
+        let mut demuxer = Demuxer::new();
+        exchange.register(&mut demuxer);
+
+        let mut remuxer = Remuxer::new();
+        exchange.register(&mut remuxer);
+
+        let mut handles = vec![];
+        handles.push(decoder.launch_worker_thread());
+        handles.push(demuxer.launch_worker_thread());
+        handles.push(remuxer.launch_worker_thread());
+        handles.push(exchange.launch_worker_thread());
+
+        core.start().unwrap();
+        thread::sleep(Duration::from_secs(1));
+        let mut output_file = std::fs::File::create("D:/output.mp4").unwrap();
+        loop {
+            if let Ok(buf) = core.consume() {
+                dbg!(output_file.write(&buf).unwrap());
+                break;
+            } else {
+                break;
+            }
+        }
+        core.stop().unwrap();
+        core.drop_all_workers().unwrap();
+
+        handles.reverse();
+
+
+        dbg!("done");
     }
 }

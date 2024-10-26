@@ -231,7 +231,7 @@ impl RemuxContext {
 
             major_brand: String::from("isom"),
             minor_version: String::from("512"),
-            compatible_brands: vec![String::from("isom"), String::from("iso2"), String::from("avc1"), String::from("mp41")],
+            compatible_brands: vec![],
 
             video_codec_type: VideoCodecType::None,
             audio_codec_type: AudioCodecType::None,
@@ -384,6 +384,10 @@ impl RemuxContext {
             _ => {}
         }
         self.video_metadata_configured = true;
+    }
+
+    pub fn is_metadata_complete(&self) -> bool {
+        self.flv_header_configured && self.metadata_configured
     }
 
     pub fn is_configured(&self) -> bool {

@@ -29,15 +29,6 @@ impl ExchangeRegistrable for Decoder {
     fn get_self_as_destination(&self) -> Destination {
         Destination::Decoder
     }
-
-    /// Launch a worker thread that will read from the stream and send the data to the demuxer.
-    /// After calling this method, the decoder instance will be moved away from the main thread.
-    /// Instead, use the exchange to manipulate the decoder.
-    fn launch_worker_thread(mut self) -> JoinHandle<()> {
-        thread::spawn(move || {
-            self.run().unwrap();
-        })
-    }
 }
 
 impl Decoder {
@@ -349,16 +340,16 @@ impl Decoder {
                             self.data.append(&mut data)
                         }
                         PackedContentToDecoder::StartDecoding => {
-                            println!("Start decoding.");
+                            println!("[Decoder] Start decoding.");
                             self.set_decoding(true);
                         }
                         PackedContentToDecoder::StopDecoding => {
-                            println!("Stop decoding.");
+                            println!("[Decoder] Stop decoding.");
                             self.set_decoding(false);
                         }
                         PackedContentToDecoder::CloseWorkerThread => {
-                            println!("Closing worker thread.");
-                            break;
+                            println!("[Decoder] Closing worker thread.");
+                            return Ok(());
                         }
                         PackedContentToDecoder::Now => {
                             // this will literally do nothing.
@@ -376,7 +367,9 @@ impl Decoder {
                 if self.data.is_empty() || (!self.decoding) {
                     break 'decoding;
                 }
-                self.decode_body_once()?
+                if self.decode_body_once().is_err() {
+                    break 'decoding;
+                }
             }
         }
         Ok(())
@@ -386,6 +379,10 @@ impl Decoder {
         const HEADER_SIZE: u32 = 11;
 
         let previous_tag_size = self.drain_u32();
+
+        if self.data.is_empty() {
+            return Err("No more data.".into());
+        }
 
         //dbg!(previous_tag_size);
         if previous_tag_size == self.previous_tag_size {
@@ -441,5 +438,16 @@ impl Decoder {
         // todo: use a better way to control the decoding loop.
         self.decode_body()?;
         Ok(())
+    }
+
+    /// Launch a worker thread that will read from the stream and send the data to the demuxer.
+    /// After calling this method, the decoder instance will be moved away from the main thread.
+    /// Instead, use the exchange to manipulate the decoder.
+    pub fn launch_worker_thread(mut self) -> JoinHandle<()> {
+        thread::spawn(move || {
+            if let Err(e) = self.run() {
+                panic!("Decoder thread stopped unexpectedly {}", e);
+            }
+        })
     }
 }

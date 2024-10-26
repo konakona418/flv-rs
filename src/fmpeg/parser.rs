@@ -222,15 +222,17 @@ impl Parser {
             ),
             io::bit::UIntParserEndian::BigEndian
         );
+        // dbg!(u16io.data);
 
-        let sync_word = u16io.read_range(0, 11);
+        let sync_word = u16io.read_range(0, 10);
         if sync_word != MP3_SYNC_WORD {
+            // dbg!(sync_word);
             return Err("MP3 sync word mismatch!".into());
         }
 
-        let version = Mp3Version::from(u16io.read_range(12, 13) as u8);
-        let layer = Mp3Layer::from(u16io.read_range(14, 15) as u8);
-        let protection_bit = u16io.read_at(16);
+        let version = Mp3Version::from(u16io.read_range(11, 12) as u8);
+        let layer = Mp3Layer::from(u16io.read_range(13, 14) as u8);
+        let protection_bit = u16io.read_at(15);
 
         let mut u16io = io::bit::U16BitIO::new(
             <u16>::from_be_bytes(

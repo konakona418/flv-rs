@@ -26,7 +26,7 @@ impl Encoder {
             .track(Self::encode_trak(ctx, DEFAULT_VIDEO_TRACK_ID, Self::encode_mdia(ctx, HandlerType::Video)))
             .track(Self::encode_trak(ctx, DEFAULT_AUDIO_TRACK_ID, Self::encode_mdia(ctx, HandlerType::Audio)))
             .build();
-        dbg!(&moov);
+        println!("{:?}", &moov);
         moov
     }
 
@@ -40,7 +40,7 @@ impl Encoder {
             .rate(1.0)
             .volume(1.0)
             .build();
-        dbg!(&mhdv);
+        // dbg!(&mhdv);
         MovieHeaderBox::V0(mhdv)
     }
 
@@ -58,7 +58,7 @@ impl Encoder {
             ),
             media_box
         );
-        dbg!(&trak);
+        // dbg!(&trak);
         trak
     }
 
@@ -68,7 +68,7 @@ impl Encoder {
             Self::encode_hdlr(ctx, handler_type.clone()),
             Self::encode_minf(ctx, handler_type),
         );
-        dbg!(&mdia);
+        // dbg!(&mdia);
         mdia
     }
 
@@ -79,13 +79,13 @@ impl Encoder {
             .timescale(TIME_SCALE)
             .duration(ctx.duration_ms)
             .build();
-        dbg!(&mdhd);
+        // dbg!(&mdhd);
         mdhd
     }
 
     pub fn encode_hdlr(ctx: &RemuxContext, handler_type: HandlerType) -> mp4head::HandlerBox {
         let hdlr = handler_type.into();
-        dbg!(&hdlr);
+        // dbg!(&hdlr);
         hdlr
     }
 
@@ -149,7 +149,7 @@ impl Encoder {
             dinf,
             stbl,
         );
-        dbg!(&minf);
+        // dbg!(&minf);
         minf
     }
 
@@ -198,7 +198,7 @@ impl Encoder {
                     .build()
             )
             .build();
-        dbg!(&traf);
+        // dbg!(&traf);
 
         // note: sequence number has already been increased HERE.
         track_ctx.sequence_number += 1;
