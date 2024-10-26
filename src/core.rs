@@ -1,6 +1,7 @@
 use crate::exchange::{Destination, ExchangeRegistrable, Packed, PackedContent, PackedContentToCore, PackedContentToDecoder, PackedContentToDemuxer, PackedContentToRemuxer};
 use std::collections::VecDeque;
 use std::sync::mpsc;
+use std::thread::JoinHandle;
 
 pub struct Core {
     channel_exchange: Option<mpsc::Sender<Packed>>,
@@ -216,6 +217,10 @@ impl ExchangeRegistrable for Core {
 
     fn get_self_as_destination(&self) -> Destination {
         Destination::Core
+    }
+
+    fn launch_worker_thread(self) -> JoinHandle<()> {
+        todo!()
     }
 }
 

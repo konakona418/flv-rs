@@ -29,6 +29,15 @@ impl ExchangeRegistrable for Decoder {
     fn get_self_as_destination(&self) -> Destination {
         Destination::Decoder
     }
+
+    /// Launch a worker thread that will read from the stream and send the data to the demuxer.
+    /// After calling this method, the decoder instance will be moved away from the main thread.
+    /// Instead, use the exchange to manipulate the decoder.
+    fn launch_worker_thread(mut self) -> JoinHandle<()> {
+        thread::spawn(move || {
+            self.run().unwrap();
+        })
+    }
 }
 
 impl Decoder {
@@ -432,14 +441,5 @@ impl Decoder {
         // todo: use a better way to control the decoding loop.
         self.decode_body()?;
         Ok(())
-    }
-
-    /// Launch a worker thread that will read from the stream and send the data to the demuxer.
-    /// After calling this method, the decoder instance will be moved away from the main thread.
-    /// Instead, use the exchange to manipulate the decoder.
-    pub fn launch_worker_thread(mut self) -> JoinHandle<()> {
-        thread::spawn(move || {
-            self.run().unwrap();
-        })
     }
 }

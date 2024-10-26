@@ -164,14 +164,6 @@ impl Demuxer {
         }
         Ok(())
     }
-
-    /// Launch a worker thread, move the self into it.
-    /// Note that the data stream will not be sent unless the StartDemuxing command is sent.
-    pub fn launch_worker_thread(mut self) -> JoinHandle<()> {
-        std::thread::spawn(move || {
-            self.run().unwrap();
-        })
-    }
 }
 
 impl ExchangeRegistrable for Demuxer {
@@ -185,5 +177,13 @@ impl ExchangeRegistrable for Demuxer {
 
     fn get_self_as_destination(&self) -> Destination {
         Destination::Demuxer
+    }
+
+    /// Launch a worker thread, move the self into it.
+    /// Note that the data stream will not be sent unless the StartDemuxing command is sent.
+    fn launch_worker_thread(mut self) -> JoinHandle<()> {
+        std::thread::spawn(move || {
+            self.run().unwrap();
+        })
     }
 }

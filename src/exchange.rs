@@ -1,6 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 use std::sync::mpsc;
+use std::thread::JoinHandle;
 use crate::flv::header::FlvHeader;
 use crate::flv::meta::RawMetaData;
 use crate::flv::tag::Tag;
@@ -60,6 +61,8 @@ pub trait ExchangeRegistrable {
 
     fn get_sender(&self) -> mpsc::Sender<PackedContent>;
     fn get_self_as_destination(&self) -> Destination;
+
+    fn launch_worker_thread(self) -> JoinHandle<()>;
 }
 
 impl Exchange {
@@ -80,9 +83,10 @@ impl Exchange {
         self.channels.get(&channel_dest).cloned()
     }
 
-    pub fn register(&mut self, mut registry: Box<dyn ExchangeRegistrable>) {
+    pub fn register(&mut self, mut registry: Box<dyn ExchangeRegistrable>) -> Box<dyn ExchangeRegistrable> {
         registry.set_exchange(self.sender.clone());
         self.channels.insert(registry.get_self_as_destination(), registry.get_sender());
+        registry
     }
 
     pub fn process_incoming(&mut self) -> Result<(), Box<dyn std::error::Error>> {

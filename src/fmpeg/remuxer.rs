@@ -40,6 +40,12 @@ impl ExchangeRegistrable for Remuxer {
     fn get_self_as_destination(&self) -> Destination {
         Destination::Remuxer
     }
+
+    fn launch_worker_thread(mut self) -> JoinHandle<()> {
+        std::thread::spawn(move || {
+            self.run().unwrap();
+        })
+    }
 }
 
 impl PartialEq for KeyframeType {
@@ -248,11 +254,5 @@ impl Remuxer {
             }
         }
         Ok(())
-    }
-
-    pub fn launch_worker_thread(mut self) -> JoinHandle<()> {
-        std::thread::spawn(move || {
-            self.run().unwrap();
-        })
     }
 }
