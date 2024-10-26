@@ -1,3 +1,4 @@
+use crate::fmpeg::encoder::{DEFAULT_AUDIO_TRACK_ID, DEFAULT_VIDEO_TRACK_ID};
 use crate::fmpeg::mp4head::avc1_utils::AvcCBoxLike::AvcCBoxLike;
 
 pub struct Utils;
@@ -299,6 +300,7 @@ pub struct MovieBox {
 
     pub movie_header: MovieHeaderBox,
     pub tracks: Vec<TrackBox>,
+    pub movie_extend_box: MovieExtendBox
 }
 
 pub struct MovieBoxBuilder {
@@ -318,13 +320,16 @@ impl ISerializable for MovieBox {
         for track in &mut self.tracks {
             result.append(&mut track.serialize());
         }
+        result.append(&mut self.movie_extend_box.serialize());
         assert_eq!(result.len(), self.size() as usize);
         result
     }
 
     #[inline]
     fn size(&self) -> u32 {
-        8 + self.movie_header.size() + self.tracks.iter().map(|track| track.size()).sum::<u32>()
+        8 + self.movie_header.size()
+            + self.tracks.iter().map(|track| track.size()).sum::<u32>()
+            + self.movie_extend_box.size()
     }
 }
 
@@ -352,6 +357,7 @@ impl MovieBoxBuilder {
             box_type: ['m', 'o', 'o', 'v'],
             movie_header: self.movie_header_box.unwrap(),
             tracks: self.tracks,
+            movie_extend_box: MovieExtendBox::new(),
         };
         box_instance.size = box_instance.size();
         assert_ne!(box_instance.size, 0);
@@ -2569,3 +2575,98 @@ impl ISerializable for ChunkOffsetBox {
 }
 
 // above are the implementation of file head.
+
+// todo: implement mvex (movie extend box)
+
+#[derive(Debug)]
+pub struct MovieExtendBox {
+    pub size: u32,
+    pub box_type: [char; 4],
+
+    pub track_extend_boxes: Vec<TrackExtendsBox>,
+}
+
+impl MovieExtendBox {
+    pub fn new() -> Self {
+        Self {
+            size: 8,
+            box_type: ['m', 'v', 'e', 'x'],
+            track_extend_boxes: vec![
+                TrackExtendsBox::new(DEFAULT_VIDEO_TRACK_ID),
+                TrackExtendsBox::new(DEFAULT_AUDIO_TRACK_ID),
+            ],
+        }
+    }
+}
+
+impl ISerializable for MovieExtendBox {
+    fn serialize(&mut self) -> Vec<u8> {
+        self.size = self.size();
+
+        let mut result = vec![];
+        result.extend_from_slice(&self.size.to_be_bytes());
+        result.extend_from_slice(&self.box_type.map(|c| c as u8));
+
+        for track_box in self.track_extend_boxes.iter_mut() {
+            result.extend_from_slice(&track_box.serialize());
+        }
+
+        result
+    }
+
+    fn size(&self) -> u32 {
+        8 + self.track_extend_boxes.iter().map(|b| b.size()).sum::<u32>()
+    }
+}
+
+#[derive(Debug)]
+pub struct TrackExtendsBox {
+    pub size: u32,
+    pub box_type: [char; 4],
+    pub version: u8,
+    pub flag: U24,
+    pub track_id: u32,
+    pub default_sample_description_index: u32,
+    pub default_sample_duration: u32,
+    pub default_sample_size: u32,
+    pub default_sample_flags: u32,
+}
+
+impl TrackExtendsBox {
+    pub fn new(track_id: u32) -> Self {
+        Self {
+            size: 32,
+            box_type: ['t', 'r', 'e', 'x'],
+            version: 0,
+            flag: U24::from(0),
+            track_id,
+            default_sample_description_index: 1,
+            default_sample_duration: 0,
+            default_sample_size: 0,
+            default_sample_flags: 0x00010001,
+        }
+    }
+}
+
+impl ISerializable for TrackExtendsBox {
+    fn serialize(&mut self) -> Vec<u8> {
+        self.size = self.size();
+        let mut result = vec![];
+
+        result.extend_from_slice(&self.size.to_be_bytes());
+        result.extend_from_slice(&self.box_type.map(|c| c as u8));
+        result.extend_from_slice(&self.version.to_be_bytes());
+        result.extend_from_slice(&self.flag.serialize());
+        result.extend_from_slice(&self.track_id.to_be_bytes());
+        result.extend_from_slice(&self.default_sample_description_index.to_be_bytes());
+        result.extend_from_slice(&self.default_sample_duration.to_be_bytes());
+        result.extend_from_slice(&self.default_sample_size.to_be_bytes());
+        result.extend_from_slice(&self.default_sample_flags.to_be_bytes());
+        assert_eq!(result.len(), 32);
+        result
+    }
+
+    fn size(&self) -> u32 {
+        32
+    }
+}

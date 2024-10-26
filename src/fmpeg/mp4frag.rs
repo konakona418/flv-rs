@@ -1,9 +1,6 @@
-use std::collections::VecDeque;
 use crate::fmpeg::mp4head::ISerializable;
 use crate::fmpeg::mp4head::U24;
 
-
-// todo: implement mvex (movie extend box)
 pub struct MovieFragmentBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -89,6 +86,7 @@ impl ISerializable for MovieFragmentHeaderBox {
     }
 }
 
+#[derive(Debug)]
 pub struct TrackFragmentBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -136,6 +134,16 @@ impl TrackFragmentBoxBuilder {
         self
     }
 
+    pub fn build(self) -> TrackFragmentBox {
+        TrackFragmentBox {
+            size: 0,
+            box_type: ['t', 'r', 'a', 'f'],
+            track_fragment_header_box: self.track_fragment_header_box,
+            track_fragment_decode_time_box: self.track_fragment_decode_time_box,
+            sample_table_box: self.sample_table_box,
+            track_run_box: self.track_run_box
+        }
+    }
 }
 
 impl ISerializable for TrackFragmentBox {
@@ -164,6 +172,7 @@ impl ISerializable for TrackFragmentBox {
     }
 }
 
+#[derive(Debug)]
 pub struct TrackFragmentHeaderBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -206,6 +215,7 @@ impl ISerializable for TrackFragmentHeaderBox {
     }
 }
 
+#[derive(Debug)]
 pub struct TrackFragmentDecodeTimeBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -248,6 +258,7 @@ impl ISerializable for TrackFragmentDecodeTimeBox {
     }
 }
 
+#[derive(Debug)]
 pub struct SampleDependencyTableBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -344,33 +355,38 @@ impl SampleFlagBuilder {
         }
     }
 
-    pub fn set_is_leading(&mut self, is_leading: bool) {
+    pub fn set_is_leading(mut self, is_leading: bool) -> SampleFlagBuilder {
         self.is_leading = is_leading;
+        self
     }
 
     /// for keyframes, set this to false
     /// for inter frames, set this to true
-    pub fn set_sample_depends_on(&mut self, sample_depends_on: bool) {
+    pub fn set_sample_depends_on(mut self, sample_depends_on: bool) -> SampleFlagBuilder {
         self.sample_depends_on = sample_depends_on;
+        self
     }
 
     /// for keyframes, set this to true
     /// for inter frames, set this to false
-    pub fn set_sample_is_depended_on(&mut self, sample_is_depended_on: bool) {
+    pub fn set_sample_is_depended_on(mut self, sample_is_depended_on: bool) -> SampleFlagBuilder {
         self.sample_is_depended_on = sample_is_depended_on;
+        self
     }
 
-    pub fn set_sample_has_redundancy(&mut self, sample_has_redundancy: bool) {
+    pub fn set_sample_has_redundancy(mut self, sample_has_redundancy: bool) -> SampleFlagBuilder {
         self.sample_has_redundancy = sample_has_redundancy;
+        self
     }
 
     /// for keyframes, set this to true
     /// for inter frames, set this to false
-    pub fn set_is_non_sync(&mut self, is_non_sync: bool) {
+    pub fn set_is_non_sync(mut self, is_non_sync: bool) -> SampleFlagBuilder {
         self.is_non_sync = is_non_sync;
+        self
     }
 
-    pub fn build(&self) -> u16 {
+    pub fn build(self) -> u16 {
         // todo: check this
         let mut result = 0;
         if self.is_leading {
@@ -402,6 +418,7 @@ impl SampleFlagBuilder {
 
 /// this is just a simple implementation
 /// which only supports one sample.
+#[derive(Debug)]
 pub struct TrackRunBox {
     pub size: u32,
     pub box_type: [char; 4],
@@ -539,5 +556,37 @@ impl TrackRunBoxBuilder {
 pub struct MovieDataBox {
     pub size: u32,
     pub box_type: [char; 4],
-    pub data: VecDeque<u8>,
+    pub data: Vec<u8>,
+}
+
+impl ISerializable for MovieDataBox {
+    fn serialize(&mut self) -> Vec<u8> {
+        self.size = self.size();
+
+        let mut result: Vec<u8> = Vec::new();
+        result.extend_from_slice(&self.size.to_be_bytes());
+        result.extend_from_slice(&self.box_type.map(|c| c as u8));
+        result.extend_from_slice(&self.data);
+        assert_ne!(result.len(), 0);
+        result
+    }
+
+    fn size(&self) -> u32 {
+        self.data.len() as u32 + 8
+    }
+}
+
+impl MovieDataBox {
+    pub fn new(data: Vec<u8>) -> MovieDataBox {
+        MovieDataBox {
+            size: 0,
+            box_type: ['m', 'd', 'a', 't'],
+            data,
+        }
+    }
+
+    pub fn add_data(mut self, data: Vec<u8>) -> Self {
+        self.data.extend(data);
+        self
+    }
 }

@@ -1,12 +1,52 @@
 use std::collections::VecDeque;
-use crate::flv::header::{AudioTagHeader, TagHeader};
+use crate::flv::header::{AudioTagHeader, TagHeader, VideoTagHeader};
 use crate::flv::tag::{NormalTagBody, Tag, TagBody};
+use crate::fmpeg::remux_context::TIME_SCALE;
 use crate::io;
+
+pub fn parse_timescale(timestamp_ms: u32) -> u32 {
+    if TIME_SCALE == 1000 {
+        timestamp_ms
+    } else {
+        timestamp_ms * TIME_SCALE / 1000
+    }
+}
 
 pub enum AudioParseResult {
     AacRaw(VecDeque<u8>),
-    AacSeqHdr(AacSequenceHeader),
+    AacSequenceHeader(AacSequenceHeader),
     Mp3(Mp3ParseResult)
+}
+
+pub enum VideoParseResult {
+    Avc1(Avc1ParseResult),
+}
+
+pub enum Avc1ParseResult {
+    AvcNalu(AvcNalu),
+    AvcSequenceHeader(VecDeque<u8>),
+    AvcEndOfSequence
+}
+
+pub struct AvcNalu {
+    pub keyframe_type: KeyframeType,
+    pub payload: VecDeque<u8>,
+}
+
+pub enum KeyframeType {
+    Keyframe,
+    Interframe,
+}
+
+impl From<u8> for KeyframeType {
+    /// for conversion from flv tag only.
+    fn from(value: u8) -> Self {
+        match value {
+            1 => KeyframeType::Keyframe,
+            2 => KeyframeType::Interframe,
+            _ => panic!("Invalid keyframe type."),
+        }
+    }
 }
 
 pub enum AudioConfigurationLike {
@@ -94,9 +134,8 @@ pub struct AacSequenceHeader {
     pub audio_object_type: u8,
     pub sampling_frequency_index: u8,
     pub channel_configuration: u8,
+    pub raw: VecDeque<u8>,
 }
-
-pub struct VideoParseResult;
 
 pub struct Parser;
 
@@ -223,15 +262,84 @@ impl Parser {
         let audio_object_type = u16io.read_range(0, 4) as u8;
         let sampling_frequency_index = u16io.read_range(5, 8) as u8;
         let channel_configuration = u16io.read_range(9, 12) as u8;
-        Ok(AudioParseResult::AacSeqHdr(AacSequenceHeader {
+        // todo: note that this is just a temporary solution and requires optimizing.
+
+        Ok(AudioParseResult::AacSequenceHeader(AacSequenceHeader {
             audio_object_type,
             sampling_frequency_index,
             channel_configuration,
+            raw: body.clone(),
         }))
     }
 
     fn parse_aac_raw(body: &VecDeque<u8>) -> Result<AudioParseResult, Box<dyn std::error::Error>> {
         Ok(AudioParseResult::AacRaw(body.clone()))
+    }
+
+    pub fn parse_video(tag: &Tag) -> Result<VideoParseResult, Box<dyn std::error::Error>> {
+        let header = match tag.tag_header {
+            TagHeader::Video(ref header) => header,
+            _ => return Err("Tag type mismatch.".into()),
+        };
+
+        let body = match tag.tag_body {
+            TagBody::Normal(ref body) => {
+                match body {
+                    NormalTagBody::Video(body) => body,
+                    _ => return Err("Tag body type mismatch.".into()),
+                }
+            },
+            _ => return Err("Encrypted video is not supported.".into()),
+        };
+
+        if header.codec_id == 7 {
+            // h264 avc
+            Self::parse_avc(header, body)
+        } else {
+            Err("Unsupported video codec.".into())
+        }
+    }
+
+    fn parse_avc(header: &VideoTagHeader, body: &VecDeque<u8>) -> Result<VideoParseResult, Box<dyn std::error::Error>> {
+        match header.avc_packet_type {
+            None => Err("AVC packet type is not set.".into()),
+            Some(pack_type) => {
+                match pack_type {
+                    // todo: use something instead of cloning.
+                    0 => Ok(VideoParseResult::Avc1(Avc1ParseResult::AvcSequenceHeader(body.clone()))),
+                    1 => Ok(VideoParseResult::Avc1(Avc1ParseResult::AvcNalu(Self::parse_avc_nalu(header, body.clone())?))),
+                    2 => Ok(VideoParseResult::Avc1(Avc1ParseResult::AvcEndOfSequence)),
+                    _ => Err("Unsupported AVC packet type.".into()),
+                }
+            }
+        }
+    }
+
+    fn parse_avc_nalu(header: &VideoTagHeader, mut payload: VecDeque<u8>) -> Result<AvcNalu, Box<dyn std::error::Error>> {
+        let size = payload.len() as u32;
+        let nalu_type = KeyframeType::from(header.frame_type);
+
+        if size != 0x00000001 { // start code not present
+            Ok(AvcNalu {
+                keyframe_type: nalu_type,
+                payload,
+            })
+        } else { // start code present
+            let mut u32io = io::bit::U32BitIO::new(size, io::bit::UIntParserEndian::BigEndian);
+            u32io.write_range(0, 31, size);
+            let data = u32io.get_data();
+
+            // convert the first 4 bytes to the chunk size.
+            payload[0] = data[0];
+            payload[1] = data[1];
+            payload[2] = data[2];
+            payload[3] = data[3];
+
+            Ok(AvcNalu {
+                keyframe_type: nalu_type,
+                payload,
+            })
+        }
     }
 
     // todo: implement video parsing.

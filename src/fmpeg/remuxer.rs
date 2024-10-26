@@ -56,19 +56,41 @@ impl Remuxer {
     }
 
     fn send_mpeg4_header(&mut self) {
-        // todo: send mpeg4 header
+        // todo: send avc header
     }
 
     fn remux(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        while let Some(tag) = self.tags.pop_front() {
+        if self.ctx.is_configured() && !self.ctx.is_header_sent() {
+            // todo: send mpeg4 header
+        }
+
+        while let Some(ref tag) = self.tags.pop_front() {
             match tag.tag_type {
                 TagType::Audio => {
-                    let parsed = Parser::parse_audio(&tag)?;
-                    // todo: fill this
+                    let parsed = Parser::parse_audio(tag)?;
+                    if self.ctx.is_configured() {
+                        if !self.ctx.is_header_sent() {
+                            // todo: send header
+                        }
+                        // todo: send audio data
+                    } else {
+                        self.ctx.configure_audio_metadata(&parsed)
+                    }
                 }
-                TagType::Video => {}
+                TagType::Video => {
+                    let parsed = Parser::parse_video(tag)?;
+                    if self.ctx.is_configured() {
+                        if !self.ctx.is_header_sent() {
+                            // todo: send header
+                        }
+                        // todo: send video data
+                    } else {
+                        self.ctx.configure_video_metadata(&parsed)
+                    }
+                }
                 TagType::Script => {}
                 TagType::Encryption => {}
+                // todo: fill these.
             }
         }
 
@@ -113,7 +135,7 @@ impl Remuxer {
             }
 
             if self.ctx.is_configured() {
-                if self.ctx.header_sent() {
+                if self.ctx.is_header_sent() {
                     self.remux()?;
                 } else {
                     self.send_mpeg4_header();
