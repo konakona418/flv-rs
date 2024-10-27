@@ -130,7 +130,10 @@ impl SampleContextBuilder {
     }
 }
 
-pub const TIME_SCALE: u32 = 1000;
+pub const TIME_SCALE: u32 = 24000;
+// Magic number!!
+// Using 1000 is not accurate enough, and will lead to audio/video sync issue (e.g. flaws, time mismatch, etc.)
+// 24000 is big enough and will not cause overflow.
 
 pub struct RemuxContext {
     pub fps: f64,
@@ -374,6 +377,9 @@ impl RemuxContext {
                 match h264_info {
                     Avc1ParseResult::AvcSequenceHeader(header) => {
                         self.video_avcc_info = AvcCBoxLike::AvcCBoxLike(Vec::from(header.clone()));
+                        // todo: handle the codec config here.
+                        // note that raw data may contain some misleading stuff.
+                        // use dbg!() to check what's inside header: &VecDeque<u8>.
                     }
                     Avc1ParseResult::AvcEndOfSequence => {
                         // todo: handle this.

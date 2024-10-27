@@ -6,11 +6,17 @@ use crate::io;
 
 #[inline]
 pub fn parse_timescale(timestamp_ms: u32) -> u32 {
-    if TIME_SCALE == 1000 {
+
+    /*if TIME_SCALE == 1000 {
         timestamp_ms
     } else {
+        // this may lead to overflow.
         timestamp_ms * TIME_SCALE / 1000
-    }
+    }*/
+
+    // Note: no more parse_timescale()
+    // it may lead to accuracy issue.
+    parse_timescale_accurate(timestamp_ms as f32)
 }
 
 #[inline]
@@ -45,12 +51,12 @@ pub fn parse_mp3_timescale(sample_rate: u32, mp3version: Mp3Version) -> u32 {
 pub fn parse_aac_timescale(sample_rate: u32) -> u32 {
     // todo: test this.
     // this may be incorrect.
-    parse_timescale_accurate((1024.0 * TIME_SCALE as f32) / sample_rate as f32)
+    parse_timescale_accurate((1024.0 * 1000.0) / sample_rate as f32)
 }
 
 #[inline]
 pub fn parse_avc_timescale(fps: f32) -> u32 {
-    parse_timescale_accurate(TIME_SCALE as f32 / fps)
+    parse_timescale_accurate(1000.0 / fps)
 }
 
 pub enum AudioParseResult {

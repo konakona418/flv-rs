@@ -131,7 +131,7 @@ impl Remuxer {
                         match parsed {
                             AudioParseResult::AacRaw(raw) => {
                                 let mut sample_ctx = SampleContextBuilder::new()
-                                    .set_decode_time(parse_timescale(parse_timescale(tag.timestamp)))
+                                    .set_decode_time(parse_timescale(tag.timestamp))
                                     .set_sample_size(raw.len() as u32)
                                     .set_sample_duration(parse_aac_timescale(self.ctx.audio_sample_rate))
                                     .set_composition_time_offset(0)
@@ -143,7 +143,7 @@ impl Remuxer {
                             }
                             AudioParseResult::Mp3(parsed) => {
                                 let mut sample_ctx = SampleContextBuilder::new()
-                                    .set_decode_time(parse_timescale(parse_timescale(tag.timestamp)))
+                                    .set_decode_time(parse_timescale(tag.timestamp))
                                     .set_sample_size(parsed.body.len() as u32)
                                     .set_sample_duration(parse_mp3_timescale(parsed.sample_rate, parsed.version))
                                     .set_composition_time_offset(0)
@@ -161,7 +161,7 @@ impl Remuxer {
                         self.ctx.configure_audio_metadata(&parsed);
                         if let AudioParseResult::Mp3(parsed) = parsed {
                             let mut sample_ctx = SampleContextBuilder::new()
-                                .set_decode_time(parse_timescale(parse_timescale(tag.timestamp)))
+                                .set_decode_time(parse_timescale(tag.timestamp))
                                 .set_sample_size(parsed.body.len() as u32)
                                 .set_sample_duration(parse_mp3_timescale(parsed.sample_rate, parsed.version))
                                 .set_composition_time_offset(0)
@@ -210,6 +210,8 @@ impl Remuxer {
                             }
                         }
                     } else {
+                        // todo: make this method return video codec configuration.
+                        // todo: for ctx.configure_audio_metadata(), do the same thing.
                         self.ctx.configure_video_metadata(&parsed)
                     }
                 }
