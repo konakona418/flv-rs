@@ -45,12 +45,12 @@ pub fn parse_mp3_timescale(sample_rate: u32, mp3version: Mp3Version) -> u32 {
 pub fn parse_aac_timescale(sample_rate: u32) -> u32 {
     // todo: test this.
     // this may be incorrect.
-    parse_timescale_accurate(1024000.0 / sample_rate as f32)
+    parse_timescale_accurate((1024.0 * TIME_SCALE as f32) / sample_rate as f32)
 }
 
 #[inline]
 pub fn parse_avc_timescale(fps: f32) -> u32 {
-    parse_timescale_accurate(1000.0 / fps as f32)
+    parse_timescale_accurate(TIME_SCALE as f32 / fps)
 }
 
 pub enum AudioParseResult {
