@@ -152,7 +152,7 @@ impl Demuxer {
                 }
             } else {
                 // todo: use a better way instead of recv().
-                println!("Channel closed.");
+                println!("[Demuxer] Channel closed.");
                 return Ok(());
             }
 

@@ -359,7 +359,7 @@ impl Decoder {
                 }
             } else {
                 // todo: use a better way to replace recv().
-                println!("Channel closed.");
+                println!("[Decoder] Channel closed.");
                 return Ok(());
             }
 

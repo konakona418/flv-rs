@@ -22,7 +22,7 @@ impl MovieFragmentBox {
     pub fn deferred_set_trun_size(&mut self) {
         let size= self.size();
         assert_ne!(size, 0);
-        self.track_fragment_box.track_run_box.data_offset = size;
+        self.track_fragment_box.track_run_box.data_offset = size + 8; // Magic!!
     }
 }
 
@@ -161,10 +161,13 @@ impl ISerializable for TrackFragmentBox {
 
         result.extend_from_slice(&self.track_fragment_header_box.serialize());
         result.extend_from_slice(&self.track_fragment_decode_time_box.serialize());
-        result.extend_from_slice(&self.sample_table_box.serialize());
 
-        self.track_run_box.data_offset = self.size();
+        // self.track_run_box.data_offset = self.size();
+
+        // todo: something wrong with this.
         result.extend_from_slice(&self.track_run_box.serialize());
+
+        result.extend_from_slice(&self.sample_table_box.serialize());
 
         result
     }
@@ -303,7 +306,7 @@ impl ISerializable for SampleDependencyTableBox {
     }
 
     fn size(&self) -> u32 {
-        16
+        13
     }
 }
 
@@ -464,6 +467,7 @@ impl TrackRunBox {
 impl ISerializable for TrackRunBox {
     fn serialize(&mut self) -> Vec<u8> {
         self.size = self.size();
+        // dbg!(&self);
 
         let mut result: Vec<u8> = Vec::new();
         result.extend_from_slice(&self.size.to_be_bytes());
@@ -476,8 +480,8 @@ impl ISerializable for TrackRunBox {
 
         result.extend_from_slice(&self.sample_duration.to_be_bytes());
         result.extend_from_slice(&self.sample_size.to_be_bytes());
-        result.extend_from_slice(&self.sample_flags.to_be_bytes());
         result.extend_from_slice(&self.reserved.to_be_bytes());
+        result.extend_from_slice(&self.sample_flags.to_be_bytes());
         result.extend_from_slice(&self.sample_composition_time_offset.to_be_bytes());
         assert_eq!(result.len(), 36);
         result
@@ -507,7 +511,7 @@ impl TrackRunBoxBuilder {
             sample_composition_time_offset: 0,
             data_offset: 0,
 
-            flag: 0x000000
+            flag: 0x000F01
         }
     }
 

@@ -16,7 +16,7 @@ impl Encoder {
             .minor_version(ctx.minor_version.parse().unwrap())
             .compatible_brands(ctx.compatible_brands.clone())
             .build();
-        dbg!(&ftyp);
+        // dbg!(&ftyp);
         ftyp
     }
 
@@ -26,7 +26,6 @@ impl Encoder {
             .track(Self::encode_trak(ctx, DEFAULT_VIDEO_TRACK_ID, Self::encode_mdia(ctx, HandlerType::Video)))
             .track(Self::encode_trak(ctx, DEFAULT_AUDIO_TRACK_ID, Self::encode_mdia(ctx, HandlerType::Audio)))
             .build();
-        println!("{:?}", &moov);
         moov
     }
 
@@ -156,8 +155,9 @@ impl Encoder {
     // todo: implement moof & mdat encoding.
 
     pub fn encode_moof(ctx: &mut RemuxContext, track_ctx: &mut TrackContext, encoding_ctx: &mut SampleContext) -> MovieFragmentBox {
+        // todo: one sequence number only?
         let mut moof = MovieFragmentBox::new(
-            track_ctx.sequence_number,
+            ctx.sequence_number,
             Self::encode_traf(ctx, track_ctx, encoding_ctx),
         );
         moof.deferred_set_trun_size();
@@ -201,7 +201,7 @@ impl Encoder {
         // dbg!(&traf);
 
         // note: sequence number has already been increased HERE.
-        track_ctx.sequence_number += 1;
+        ctx.sequence_number += 1;
         traf
     }
 

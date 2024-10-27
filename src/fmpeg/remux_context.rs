@@ -173,6 +173,8 @@ pub struct RemuxContext {
     metadata_configured: bool,
     video_metadata_configured: bool,
     audio_metadata_configured: bool,
+
+    pub(crate) sequence_number: u32,
 }
 
 pub enum VideoCodecType {
@@ -241,6 +243,8 @@ impl RemuxContext {
             metadata_configured: false,
             video_metadata_configured: false,
             audio_metadata_configured: false,
+
+            sequence_number: 1,
         }
     }
 

@@ -155,7 +155,7 @@ impl Remuxer {
                                 self.send_raw_data(data)?;
                             }
                             _ => {
-                                panic!("Aac format header not set!")
+                                panic!("[Remuxer] Aac format header not set!")
                             }
                         }
                     } else {
@@ -202,11 +202,11 @@ impl Remuxer {
                                     self.send_raw_data(send_data)?;
                                 }
                                 Avc1ParseResult::AvcSequenceHeader(_) => {
-                                    panic!("Avc sequence header not set!")
+                                    panic!("[Remuxer] Avc sequence header not set!")
                                 }
                                 Avc1ParseResult::AvcEndOfSequence => {
                                     // todo: handle end of sequence
-                                    println!("End of sequence.")
+                                    println!("[Remuxer] End of sequence.")
                                 }
                             }
                         }
@@ -257,7 +257,7 @@ impl Remuxer {
                     }
                 }
             } else {
-                println!("Channel closed.");
+                println!("[Remuxer] Channel closed.");
                 break;
             }
 
@@ -267,11 +267,11 @@ impl Remuxer {
 
             if self.ctx.is_metadata_complete() {
                 if self.remux().is_err() {
-                    println!("Channel closed");
+                    println!("[Remuxer] Channel closed");
                     break;
                 }
             } else {
-                println!("Not configured yet.");
+                println!("[Remuxer] Not configured yet.");
             }
         }
         Ok(())

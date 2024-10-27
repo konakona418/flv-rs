@@ -2330,14 +2330,24 @@ pub mod avc1_utils {
     impl ISerializable for AvcCBoxLike {
         #[inline]
         fn serialize(&mut self) -> Vec<u8> {
-            match self {
+            let mut raw = match self {
                 Self::AvcCBoxLike(data) => data.clone(),
-            }
+            };
+
+            // dbg!(raw.len());
+
+            let mut size = self.size();
+
+            let mut  serialized = size.to_be_bytes().to_vec();
+            let mut box_type = ['a', 'v', 'c', 'C'].map(|c| c as u8).to_vec();
+            serialized.append(&mut box_type);
+            serialized.append(&mut raw);
+            serialized
         }
 
         fn size(&self) -> u32 {
             match self {
-                Self::AvcCBoxLike(data) => data.len() as u32,
+                Self::AvcCBoxLike(data) => data.len() as u32 + 8,
             }
         }
     }

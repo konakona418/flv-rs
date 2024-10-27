@@ -218,20 +218,23 @@ mod tests {
         core.start().unwrap();
         thread::sleep(Duration::from_secs(1));
         let mut output_file = std::fs::File::create("D:/output.mp4").unwrap();
+        let mut buf_written = 0;
         loop {
             if let Ok(buf) = core.consume() {
-                dbg!(output_file.write(&buf).unwrap());
-                break;
+                buf_written += output_file.write(&buf).unwrap();
+                // todo: not sure why ffmpeg cannot convert the output file.
+                // consider skipping ffmpeg.
             } else {
                 break;
             }
         }
+        println!("File successfully written: {} KiBs in total.", buf_written / 1024);
         core.stop().unwrap();
         core.drop_all_workers().unwrap();
 
         handles.reverse();
 
 
-        dbg!("done");
+        println!("Done.");
     }
 }
