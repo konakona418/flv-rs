@@ -372,7 +372,6 @@ impl Decoder {
                 }
             }
         }
-        Ok(())
     }
 
     pub fn decode_body_once(&mut self) -> Result<(), Box<dyn std::error::Error>> {

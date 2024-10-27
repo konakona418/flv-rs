@@ -162,7 +162,6 @@ impl Demuxer {
 
             self.send_from_cache()?;
         }
-        Ok(())
     }
 
     /// Launch a worker thread, move the self into it.

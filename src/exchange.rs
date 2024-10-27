@@ -1,11 +1,10 @@
+use crate::flv::header::FlvHeader;
+use crate::flv::meta::RawMetaData;
+use crate::flv::tag::Tag;
 use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 use std::sync::mpsc;
 use std::thread::JoinHandle;
-use crate::core::Core;
-use crate::flv::header::FlvHeader;
-use crate::flv::meta::RawMetaData;
-use crate::flv::tag::Tag;
 
 pub struct Exchange {
     receiver: mpsc::Receiver<Packed>,

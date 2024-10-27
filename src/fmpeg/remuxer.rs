@@ -1,17 +1,16 @@
-use std::cmp::PartialEq;
+use crate::exchange::PackedContentToCore::Data;
 use crate::exchange::{Destination, ExchangeRegistrable, Packed, PackedContent, PackedContentToRemuxer};
+use crate::flv::header::FlvHeader;
 use crate::flv::meta::RawMetaData;
 use crate::flv::tag::{Tag, TagType};
-use std::collections::VecDeque;
-use std::ptr::eq;
-use std::sync::mpsc;
-use std::thread::JoinHandle;
-use crate::exchange::PackedContentToCore::Data;
-use crate::flv::header::FlvHeader;
 use crate::fmpeg::encoder::{Encoder, DEFAULT_AUDIO_TRACK_ID, DEFAULT_VIDEO_TRACK_ID};
 use crate::fmpeg::mp4head::ISerializable;
 use crate::fmpeg::parser::{parse_aac_timescale, parse_avc_timescale, parse_mp3_timescale, parse_timescale, AudioParseResult, Avc1ParseResult, KeyframeType, Parser, VideoParseResult};
-use crate::fmpeg::remux_context::{RemuxContext, SampleContext, SampleContextBuilder, TrackContext, TrackType};
+use crate::fmpeg::remux_context::{RemuxContext, SampleContextBuilder, TrackContext, TrackType};
+use std::cmp::PartialEq;
+use std::collections::VecDeque;
+use std::sync::mpsc;
+use std::thread::JoinHandle;
 
 pub struct Remuxer {
     channel_exchange: Option<mpsc::Sender<Packed>>,

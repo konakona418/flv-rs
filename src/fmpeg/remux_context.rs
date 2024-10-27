@@ -1,6 +1,5 @@
 use crate::flv::header::FlvHeader;
 use crate::flv::meta::RawMetaData;
-use crate::fmpeg::encoder::{DEFAULT_AUDIO_TRACK_ID, DEFAULT_VIDEO_TRACK_ID};
 use crate::fmpeg::mp4head::avc1_utils::AvcCBoxLike;
 use crate::fmpeg::parser::{AudioParseResult, Avc1ParseResult, Channel, VideoParseResult};
 
