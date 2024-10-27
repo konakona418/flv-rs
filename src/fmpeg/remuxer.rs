@@ -83,7 +83,7 @@ impl Remuxer {
     fn send(&mut self, pack: Packed) -> Result<(), Box<dyn std::error::Error>> {
         match self.channel_exchange.as_ref().unwrap().send(pack) {
             Ok(_) => Ok(()),
-            Err(e) => Err("Channel closed.".into())
+            Err(e) => Err("[Remuxer] Channel closed.".into())
         }
     }
 

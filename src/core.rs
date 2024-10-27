@@ -26,7 +26,7 @@ impl Core {
             .as_ref()
             .unwrap()
             .send(packed) {
-            Err("Channel closed.".into())
+            Err("[Core] Channel closed.".into())
         } else {
             Ok(())
         }

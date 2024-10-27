@@ -94,7 +94,7 @@ impl Exchange {
                 .unwrap()
                 .send(received.packed_content)?;
         } else {
-            return Err("Channel closed.".into());
+            return Err("[Exchange] Channel closed.".into());
         }
         Ok(())
     }
