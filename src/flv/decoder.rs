@@ -432,8 +432,13 @@ impl Decoder {
     }
 
     fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let flv_header = self.decode_header()?;
-        self.send_header_to_demuxer(flv_header)?;
+        loop {
+            // this is to ensure the header is read.
+            if let Ok(flv_header) = self.decode_header() {
+                self.send_header_to_demuxer(flv_header)?;
+                break;
+            }
+        }
         // todo: use a better way to control the decoding loop.
         self.decode_body()?;
         Ok(())
