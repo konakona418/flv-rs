@@ -1,3 +1,4 @@
+use crate::exchange::{AudioCodecConfig, VideoCodecConfig};
 use crate::flv::header::FlvHeader;
 use crate::flv::meta::RawMetaData;
 use crate::fmpeg::mp4head::avc1_utils::AvcCBoxLike;
@@ -325,7 +326,7 @@ impl RemuxContext {
         16000, 12000, 11025, 8000,
         7350
     ];
-    pub fn configure_audio_metadata(&mut self, audio_metadata: &AudioParseResult) {
+    pub fn configure_audio_metadata(&mut self, audio_metadata: &AudioParseResult) -> Option<AudioCodecConfig> {
         match audio_metadata {
             AudioParseResult::AacSequenceHeader(aac_info) => {
                 if self.audio_codec_id != 10 {
@@ -338,6 +339,10 @@ impl RemuxContext {
                 }
                 self.audio_sample_rate = Self::AAC_SAMPLE_RATES[aac_info.sampling_frequency_index as usize];
                 self.audio_aac_info = Vec::from(aac_info.raw.clone());
+
+                self.audio_metadata_configured = true;
+
+                Some(AudioCodecConfig::new(AudioCodecType::Aac, aac_info.audio_object_type))
             }
             AudioParseResult::Mp3(mp3_info) => {
                 if self.audio_codec_id != 2 {
@@ -360,18 +365,22 @@ impl RemuxContext {
                     }
                 };
                 self.audio_sample_rate = mp3_info.sample_rate;
+
+                self.audio_metadata_configured = true;
+
+                Some(AudioCodecConfig::new(AudioCodecType::Mp3, 0))
             }
             _ => {
                 // raw data, do nothing.
-                return;
+                None
             }
         }
 
-        self.audio_metadata_configured = true;
+        // self.audio_metadata_configured = true;
         // todo: test this.
     }
 
-    pub fn configure_video_metadata(&mut self, video_metadata: &VideoParseResult) {
+    pub fn configure_video_metadata(&mut self, video_metadata: &VideoParseResult) -> Option<VideoCodecConfig> {
         match video_metadata {
             VideoParseResult::Avc1(h264_info) => {
                 match h264_info {
@@ -380,19 +389,29 @@ impl RemuxContext {
                         // todo: handle the codec config here.
                         // note that raw data may contain some misleading stuff.
                         // use dbg!() to check what's inside header: &VecDeque<u8>.
+                        let codec_conf = VideoCodecConfig::new(
+                            header[1],
+                            header[2],
+                            header[3]
+                        );
+
+                        self.video_metadata_configured = true;
+                        Some(codec_conf)
                     }
                     Avc1ParseResult::AvcEndOfSequence => {
                         // todo: handle this.
+                        None
                     }
                     _ => {
                         // raw data, do nothing.
-                        return;
+                        None
                     }
                 }
             }
-            _ => {}
+            _ => {
+                None
+            }
         }
-        self.video_metadata_configured = true;
     }
 
     pub fn is_metadata_complete(&self) -> bool {

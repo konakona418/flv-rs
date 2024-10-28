@@ -23,6 +23,7 @@ mod tests {
     use crate::fmpeg::remuxer::Remuxer;
     use crate::io::bit::UIntParserEndian;
     use crate::core::IConsumable;
+    use crate::exchange::RemuxedData;
     use super::*;
 
     #[test]
@@ -193,7 +194,7 @@ mod tests {
 
     #[test]
     fn test_all() {
-        let mut buf = std::fs::read("D:/test.flv").unwrap();
+        let mut buf = std::fs::read("D:/test_aac.flv").unwrap();
 
         let mut exchange = exchange::Exchange::new();
 
@@ -217,10 +218,16 @@ mod tests {
 
         core.start().unwrap();
         thread::sleep(Duration::from_secs(1));
-        let mut output_file = std::fs::File::create("D:/output.mp4").unwrap();
+        println!("{:?}", core.get_codec_conf().unwrap());
+        let mut output_file = std::fs::File::create("D:/output_aac.mp4").unwrap();
         let mut buf_written = 0;
         loop {
             if let Ok(buf) = core.consume() {
+                let buf = match buf {
+                    RemuxedData::Header(data) => data,
+                    RemuxedData::Audio(data) => data,
+                    RemuxedData::Video(data) => data,
+                };
                 buf_written += output_file.write(&buf).unwrap();
                 // todo: not sure why ffmpeg cannot convert the output file.
                 // consider skipping ffmpeg.
@@ -229,7 +236,10 @@ mod tests {
             }
         }
         println!("File successfully written: {} KiBs in total.", buf_written / 1024);
-        core.stop().unwrap();
+        match core.stop() {
+            Ok(_) => println!("Core stopped."),
+            Err(e) => panic!("Error: {}", e),
+        }
         core.drop_all_workers().unwrap();
 
         handles.reverse();

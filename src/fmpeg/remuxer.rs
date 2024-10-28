@@ -1,5 +1,5 @@
 use crate::exchange::PackedContentToCore::Data;
-use crate::exchange::{Destination, ExchangeRegistrable, Packed, PackedContent, PackedContentToRemuxer};
+use crate::exchange::{Destination, ExchangeRegistrable, MseDecoderConfig, Packed, PackedContent, PackedContentToCore, PackedContentToRemuxer, RemuxedData};
 use crate::flv::header::FlvHeader;
 use crate::flv::meta::RawMetaData;
 use crate::flv::tag::{Tag, TagType};
@@ -95,12 +95,12 @@ impl Remuxer {
         self.send(
             Packed {
                 packed_routing: Destination::Core,
-                packed_content: PackedContent::ToCore(Data(header)),
+                packed_content: PackedContent::ToCore(Data(RemuxedData::Header(header))),
             }
         )
     }
 
-    fn send_raw_data(&mut self, data: Vec<u8>) -> Result<(), Box<dyn std::error::Error>> {
+    fn send_raw_data(&mut self, data: RemuxedData) -> Result<(), Box<dyn std::error::Error>> {
         self.send(
             Packed {
                 packed_routing: Destination::Core,
@@ -113,7 +113,7 @@ impl Remuxer {
         if self.ctx.is_configured() && !self.ctx.is_header_sent() {
             self.send_mpeg4_header()?;
             if let Some(tmp) = self._temp.take() {
-                self.send_raw_data(tmp)?;
+                self.send_raw_data(RemuxedData::Audio(tmp))?;
             }
         }
 
@@ -125,7 +125,7 @@ impl Remuxer {
                         if !self.ctx.is_header_sent() {
                             self.send_mpeg4_header()?;
                             if let Some(tmp) = self._temp.take() {
-                                self.send_raw_data(tmp)?;
+                                self.send_raw_data(RemuxedData::Audio(tmp))?;
                             }
                         }
                         match parsed {
@@ -139,7 +139,7 @@ impl Remuxer {
 
                                 let mut data = Encoder::encode_moof(&mut self.ctx, &mut self.audio_track, &mut sample_ctx).serialize();
                                 data.append(&mut Encoder::encode_mdat(Vec::from(raw)).serialize());
-                                self.send_raw_data(data)?;
+                                self.send_raw_data(RemuxedData::Audio(data))?;
                             }
                             AudioParseResult::Mp3(parsed) => {
                                 let mut sample_ctx = SampleContextBuilder::new()
@@ -151,14 +151,15 @@ impl Remuxer {
 
                                 let mut data = Encoder::encode_moof(&mut self.ctx, &mut self.audio_track, &mut sample_ctx).serialize();
                                 data.append(&mut Encoder::encode_mdat(parsed.body).serialize());
-                                self.send_raw_data(data)?;
+                                self.send_raw_data(RemuxedData::Audio(data))?;
                             }
                             _ => {
                                 panic!("[Remuxer] Aac format header not set!")
                             }
                         }
                     } else {
-                        self.ctx.configure_audio_metadata(&parsed);
+                        let audio_codec_conf =  self.ctx.configure_audio_metadata(&parsed);
+
                         if let AudioParseResult::Mp3(parsed) = parsed {
                             let mut sample_ctx = SampleContextBuilder::new()
                                 .set_decode_time(parse_timescale(tag.timestamp))
@@ -171,6 +172,17 @@ impl Remuxer {
                             data.append(&mut Encoder::encode_mdat(parsed.body).serialize());
                             self._temp = Some(data);
                         }
+
+                        if let Some(conf) = audio_codec_conf {
+                            self.send( Packed {
+                                packed_routing: Destination::Core,
+                                packed_content: PackedContent::ToCore(
+                                    PackedContentToCore::DecoderConfig(
+                                        MseDecoderConfig::AudioCodec(conf)
+                                    )
+                                )
+                            })?;
+                        }
                     }
                 }
                 TagType::Video => {
@@ -179,7 +191,7 @@ impl Remuxer {
                         if !self.ctx.is_header_sent() {
                             self.send_mpeg4_header()?;
                             if let Some(tmp) = self._temp.take() {
-                                self.send_raw_data(tmp)?;
+                                self.send_raw_data(RemuxedData::Video(tmp))?;
                             }
                         }
                         if let VideoParseResult::Avc1(parsed) = parsed {
@@ -198,7 +210,7 @@ impl Remuxer {
 
                                     let mut send_data = Encoder::encode_moof(&mut self.ctx, &mut self.video_track, &mut sample_ctx).serialize();
                                     send_data.append(&mut Encoder::encode_mdat(Vec::from(data.payload)).serialize());
-                                    self.send_raw_data(send_data)?;
+                                    self.send_raw_data(RemuxedData::Video(send_data))?;
                                 }
                                 Avc1ParseResult::AvcSequenceHeader(_) => {
                                     panic!("[Remuxer] Avc sequence header not set!")
@@ -212,7 +224,18 @@ impl Remuxer {
                     } else {
                         // todo: make this method return video codec configuration.
                         // todo: for ctx.configure_audio_metadata(), do the same thing.
-                        self.ctx.configure_video_metadata(&parsed)
+                        if let Some(conf) = self.ctx.configure_video_metadata(&parsed) {
+                            self.send(
+                                Packed {
+                                    packed_routing: Destination::Core,
+                                    packed_content: PackedContent::ToCore(
+                                        PackedContentToCore::DecoderConfig(
+                                            MseDecoderConfig::VideoCodec(conf)
+                                        )
+                                    )
+                                }
+                            )?;
+                        }
                     }
                 }
                 TagType::Script => {}

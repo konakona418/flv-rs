@@ -1,4 +1,4 @@
-use crate::exchange::{Destination, ExchangeRegistrable, Packed, PackedContent, PackedContentToCore, PackedContentToDecoder, PackedContentToDemuxer, PackedContentToRemuxer};
+use crate::exchange::{AudioCodecConfig, Destination, ExchangeRegistrable, MseDecoderConfig, Packed, PackedContent, PackedContentToCore, PackedContentToDecoder, PackedContentToDemuxer, PackedContentToRemuxer, RemuxedData, VideoCodecConfig};
 use std::collections::VecDeque;
 use std::sync::mpsc;
 
@@ -7,7 +7,10 @@ pub struct Core {
     channel_receiver: mpsc::Receiver<PackedContent>,
     channel_sender: mpsc::Sender<PackedContent>,
 
-    pub buffer: VecDeque<Vec<u8>>
+    pub buffer: VecDeque<RemuxedData>,
+
+    audio_codec_conf: Option<AudioCodecConfig>,
+    video_codec_conf: Option<VideoCodecConfig>,
 }
 
 impl Core {
@@ -18,7 +21,31 @@ impl Core {
             channel_receiver,
             channel_sender,
             buffer: VecDeque::new(),
+            audio_codec_conf: None,
+            video_codec_conf: None,
         }
+    }
+
+    pub fn process_incoming(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        while let Ok(data) = self.channel_receiver.try_recv() {
+            match data {
+                PackedContent::ToCore(PackedContentToCore::Data(data)) => {
+                    self.buffer.push_back(data);
+                },
+                PackedContent::ToCore(PackedContentToCore::DecoderConfig(conf)) => {
+                    match conf {
+                        MseDecoderConfig::AudioCodec(audio_codec) => {
+                            self.audio_codec_conf = Some(audio_codec);
+                        }
+                        MseDecoderConfig::VideoCodec(video_codec) => {
+                            self.video_codec_conf = Some(video_codec);
+                        }
+                    }
+                },
+                _ => {}
+            };
+        };
+        Ok(())
     }
 
     pub fn send(&self, packed: Packed) -> Result<(), Box<dyn std::error::Error>> {
@@ -220,21 +247,58 @@ impl ExchangeRegistrable for Core {
 }
 
 impl IConsumable for Core {
-    type ConsumerData = Vec<u8>;
+    type ConsumerData = RemuxedData;
 
-    fn consume(&mut self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        while let Ok(data) = self.channel_receiver.try_recv() {
-            match data {
-                PackedContent::ToCore(PackedContentToCore::Data(data)) => {
-                    self.buffer.push_back(data);
-                },
-                _ => {}
-            };
-        };
+    fn consume(&mut self) -> Result<RemuxedData, Box<dyn std::error::Error>> {
+        self.process_incoming()?;
+
         if let Some(data) = self.buffer.pop_front() {
             Ok(data)
         } else {
             Err("No data available".into())
+        }
+    }
+}
+
+impl Core {
+    pub fn get_audio_codec_conf(&mut self) -> Option<String> {
+        match self.audio_codec_conf {
+            Some(ref mut conf) => Some(conf.audio_conf()),
+            None => None
+        }
+    }
+
+    pub fn get_video_codec_conf(&mut self) -> Option<String> {
+        match self.video_codec_conf {
+            Some(ref mut conf) => Some(conf.video_conf()),
+            None => None
+        }
+    }
+
+    pub fn is_codec_configured(&self) -> bool {
+        self.audio_codec_conf.is_some() && self.video_codec_conf.is_some()
+    }
+
+    /// Returns the codec configuration if it is already set
+    /// Returns a tuple of audio and video codec configuration in String.
+    /// If the codec configuration is not set, returns None.
+    /// This method will not block.
+    pub fn try_get_codec_conf(&mut self) -> Option<(String, String)> {
+        if self.is_codec_configured() {
+            return Some((self.get_audio_codec_conf()?, self.get_video_codec_conf()?));
+        }
+        None
+    }
+
+    /// Returns the codec configuration. This method will block until the codec configuration is ready.
+    pub fn get_codec_conf(&mut self) -> Result<(String, String), Box<dyn std::error::Error>> {
+        self.process_incoming()?;
+
+        loop {
+            match self.try_get_codec_conf() {
+                Some(conf) => return Ok(conf),
+                None => self.now()?
+            }
         }
     }
 }

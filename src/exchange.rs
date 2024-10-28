@@ -2,9 +2,11 @@ use crate::flv::header::FlvHeader;
 use crate::flv::meta::RawMetaData;
 use crate::flv::tag::Tag;
 use std::collections::{HashMap, VecDeque};
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::mpsc;
 use std::thread::JoinHandle;
+use crate::fmpeg::remux_context::AudioCodecType;
 
 pub struct Exchange {
     receiver: mpsc::Receiver<Packed>,
@@ -121,8 +123,80 @@ pub enum PackedContent {
 }
 
 pub enum PackedContentToCore {
-    Data(Vec<u8>),
+    Data(RemuxedData),
+    DecoderConfig(MseDecoderConfig),
     Command
+}
+
+pub enum RemuxedData {
+    Header(Vec<u8>),
+    Audio(Vec<u8>),
+    Video(Vec<u8>)
+}
+
+pub enum MseDecoderConfig {
+    AudioCodec(AudioCodecConfig),
+    VideoCodec(VideoCodecConfig)
+}
+
+/// Note: mp3 in video is not supported by some browsers.
+/// So in certain circumstances, take special care.
+pub struct AudioCodecConfig {
+    conf_string: String,
+
+    pub audio_codec_type: AudioCodecType,
+    pub audio_object_type: u8,
+}
+
+impl AudioCodecConfig {
+    pub fn new(codec_type: AudioCodecType, object_type: u8) -> AudioCodecConfig {
+        Self {
+            conf_string: "".to_string(),
+            audio_codec_type: codec_type,
+            audio_object_type: object_type
+        }
+    }
+
+    pub fn audio_conf(&mut self) -> String {
+        match self.audio_codec_type {
+            AudioCodecType::Aac => {
+                if self.conf_string.is_empty() {
+                    self.conf_string = format!("mp4a.40.{}", self.audio_object_type);
+                }
+                self.conf_string.clone()
+            }
+            AudioCodecType::Mp3 => {
+                "mp3".to_string()
+            }
+            AudioCodecType::None => {
+                panic!("No audio codec type specified.")
+            }
+        }
+    }
+}
+
+pub struct VideoCodecConfig {
+    pub conf_string: String,
+
+    pub avc_profile_indication: u8,
+    pub avc_profile_compatibility: u8,
+    pub avc_level_indication: u8,
+}
+
+impl VideoCodecConfig {
+    pub fn new(profile_indication: u8, profile_compatibility: u8, level_indication: u8) -> VideoCodecConfig {
+        Self {
+            conf_string: "".to_string(),
+            avc_profile_indication: profile_indication,
+            avc_profile_compatibility: profile_compatibility,
+            avc_level_indication: level_indication
+        }
+    }
+
+    pub fn video_conf(&mut self) -> String {
+        self.conf_string = format!("avc1.{:x}{:x}{:x}", self.avc_profile_indication, self.avc_profile_compatibility, self.avc_level_indication);
+        self.conf_string.clone()
+    }
 }
 
 pub enum PackedContentToDecoder {
